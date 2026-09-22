@@ -89,7 +89,17 @@
   .settingsrow .field{flex:1}
   .pillbtn{border:1px solid var(--line);background:var(--card);padding:7px 10px;border-radius:999px;font-size:12px}
   .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-  .sectionlabel{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em;margin:10px 2px 6px}
+  .sectionlabel{font-size:14px;color:var(--ink);font-weight:850;letter-spacing:.03em;margin:22px 2px 8px;padding-top:4px;border-top:1px solid var(--line)}
+  .sectionlabel:first-of-type{border-top:0;margin-top:4px}
+  .subnote{font-size:12px;color:var(--muted);line-height:1.65;margin:4px 2px 12px}
+  .modebox{background:var(--soft);border-radius:14px;padding:12px;margin:10px 0 14px}
+  .choicegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 12px}
+  .choicegrid button{border:1px solid var(--line);background:var(--soft);border-radius:12px;padding:11px 8px;font-weight:700;color:var(--ink)}
+  .choicegrid button.active{background:var(--green2);border-color:#bdcfbb;color:#35533b}
+  .activityhelp{display:grid;gap:7px;margin-top:8px}
+  .activityitem{background:#fffdf9;border:1px solid var(--line);border-radius:11px;padding:9px 10px;font-size:11px;line-height:1.55;color:var(--muted)}
+  .activityitem b{color:var(--ink);font-size:12px}
+  .sourcebox{font-size:11px;color:var(--muted);line-height:1.55;background:#f7f4ec;border-radius:10px;padding:9px 10px;margin-top:8px}
   @media (max-width:390px){.hero{grid-template-columns:1fr} .nutrients{grid-template-columns:1fr}}
 </style>
 </head>
@@ -186,19 +196,76 @@
 <dialog id="settingsDialog">
   <div class="modal">
     <div class="modalhead"><h3>設定</h3><button class="close" data-close="settingsDialog">×</button></div>
-    <div class="sectionlabel">ざっくり目安</div>
-    <div class="settingsrow">
-      <div class="field"><label>1日のカロリー目安</label><input id="targetKcal" type="number"></div>
-      <div class="field"><label>食物繊維目安（g）</label><input id="targetFiber" type="number" step="0.1"></div>
+
+    <div class="sectionlabel">摂取量の目安</div>
+    <div class="subnote">カロリーと食物繊維の目安を設定します。厚生労働省「日本人の食事摂取基準（2025年版）」から自動設定するか、自分で入力できます。</div>
+
+    <div class="choicegrid">
+      <button id="autoModeBtn" type="button">基準値から自動設定</button>
+      <button id="manualModeBtn" type="button">手動設定</button>
     </div>
-    <div class="settingsrow">
-      <div class="field"><label>植物性食品（種類）</label><input id="targetPlants" type="number"></div>
-      <div class="field"><label>発酵食品（品）</label><input id="targetFerment" type="number"></div>
+
+    <div id="autoSettingsBox" class="modebox">
+      <div class="grid2">
+        <div class="field"><label>年齢</label><input id="profileAge" type="number" min="18" max="120" inputmode="numeric" placeholder="例：43"></div>
+        <div class="field"><label>性別</label>
+          <select id="profileSex">
+            <option value="female">女性</option>
+            <option value="male">男性</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>身体活動レベル</label>
+        <select id="profileActivity">
+          <option value="low">低い</option>
+          <option value="normal" selected>ふつう</option>
+          <option value="high">高い</option>
+        </select>
+        <div class="activityhelp">
+          <div class="activityitem"><b>低い</b>　生活の大部分が座位で、静かな活動が中心</div>
+          <div class="activityitem"><b>ふつう</b>　座り仕事中心でも、通勤・買い物・家事・軽い運動などがある</div>
+          <div class="activityitem"><b>高い</b>　移動や立ち仕事が多い、または運動習慣がしっかりある</div>
+        </div>
+      </div>
+      <button class="secondary" id="applyReferenceValues" type="button">基準値から設定する</button>
+      <div id="referenceResult" class="sourcebox">年齢・性別・活動量を選んで「基準値から設定する」を押してください。</div>
+    </div>
+
+    <div id="manualSettingsBox" class="modebox">
+      <div class="settingsrow">
+        <div class="field"><label>1日のカロリー目安</label><input id="targetKcal" type="number" min="0" step="50"></div>
+        <div class="field"><label>食物繊維目安（g）</label><input id="targetFiber" type="number" min="0" step="1"></div>
+      </div>
+      <div class="tiny">自動設定後でも、手動設定に切り替えて自由に変更できます。</div>
+    </div>
+
+    <div class="sectionlabel">腸活の詳細</div>
+    <div class="subnote">植物性食品の多様性や発酵食品も見たい場合に使います。ここは国の公式基準ではなく、このアプリ独自の「食事の多様性を見るための補助指標」です。</div>
+    <div class="field">
+      <label>腸活の詳細チェック</label>
+      <select id="gutDetailMode">
+        <option value="on">使う</option>
+        <option value="off">使わない</option>
+      </select>
+      <div class="tiny">OFFにすると、植物性食品・発酵食品についての判定とアドバイスを控えめにします。</div>
+    </div>
+
+    <div id="gutDetailBox" class="modebox">
+      <div class="field">
+        <label>植物性食品の種類</label>
+        <div class="subnote">いろいろな植物性食品を食べることで、食物繊維や腸内細菌のえさになる成分の種類も増やしやすくなります。</div>
+        <input id="targetPlants" type="number" min="1" placeholder="アプリ内の目安">
+      </div>
+      <div class="field">
+        <label>発酵食品</label>
+        <div class="subnote">発酵食品は腸活のひとつの選択肢です。厳密なノルマではなく、日々取り入れられているかを見るための目安として使います。</div>
+        <input id="targetFerment" type="number" min="1" placeholder="アプリ内の目安">
+      </div>
     </div>
 
     <div class="sectionlabel">データ処理の設定</div>
     <div class="field">
-      <label>1️⃣ このアプリで使った写真を写真アプリにも残す</label>
+      <label>このアプリで使った写真を写真アプリにも残す</label>
       <select id="photoSaveMode">
         <option value="off">しない</option>
         <option value="on">する</option>
@@ -206,7 +273,7 @@
       <div class="tiny">ライブラリから選んだ元画像はそのまま残ります。ここでは、アプリ内で使った写真を写真アプリにも残す運用かどうかを決めます。</div>
     </div>
     <div class="field">
-      <label>2️⃣ 週間まとめを書き出したら、この週のデータと写真を削除する</label>
+      <label>週間まとめを書き出したら、この週のデータと写真を削除する</label>
       <select id="deleteAfterExportMode">
         <option value="on">する</option>
         <option value="off">しない</option>
@@ -215,7 +282,7 @@
     </div>
 
     <button class="primary" id="saveSettings">保存</button>
-    <div class="tiny">数値は「厳密な栄養計算」ではなく、日々の傾向を見るためのものです。</div>
+    <div class="tiny">基準値は健康な人を対象とした集団の目安です。体調や治療状況によって個別の目標は異なります。</div>
   </div>
 </dialog>
 
@@ -248,9 +315,8 @@
   <div class="modal">
     <div class="modalhead"><h3>腸活プラスの考え方</h3><button class="close" data-close="aboutDialog">×</button></div>
     <div class="advice">
-      このプロトタイプでは、<strong>食物繊維・発酵食品・植物性食品の種類・腸活食材</strong>を組み合わせて0〜100で表示します。
-      数字を競うためではなく、「今日は偏ってないかな？」を一目で見るための目安です。<br><br>
-      食物繊維 40点、植物性食品の種類 25点、発酵食品 20点、腸活食材 15点を上限に加算しています。
+      このアプリでは、<strong>食物繊維・腸活食材</strong>を基本に、設定で「腸活の詳細チェック」をONにした場合は<strong>植物性食品の種類・発酵食品</strong>も加えて表示します。
+      数字を競うためではなく、「今日は偏ってないかな？」を一目で見るための目安です。
     </div>
   </div>
 </dialog>
@@ -263,6 +329,12 @@ const defaultSettings = {
   targetFiber: 18,
   targetPlants: 10,
   targetFerment: 2,
+  intakeMode: "manual",
+  age: "",
+  sex: "female",
+  activity: "normal",
+  gutDetail: true,
+  referenceVersion: "2025",
   saveToPhotos: false,
   deleteAfterExport: true
 };
@@ -361,6 +433,63 @@ function updateStorageTexts(){
   if(n) n.innerHTML=storageNoteText();
 }
 
+// 厚生労働省「日本人の食事摂取基準（2025年版）」成人の基準値
+// 推定エネルギー必要量: 参考表2、食物繊維: 1-4 炭水化物の目標量（成人）
+const OFFICIAL_2025 = {
+  energy: {
+    male: {
+      "18-29": {low:2250, normal:2600, high:3000},
+      "30-49": {low:2350, normal:2750, high:3150},
+      "50-64": {low:2250, normal:2650, high:3000},
+      "65-74": {low:2100, normal:2350, high:2650},
+      "75+":   {low:1850, normal:2250, high:null}
+    },
+    female: {
+      "18-29": {low:1700, normal:1950, high:2250},
+      "30-49": {low:1750, normal:2050, high:2350},
+      "50-64": {low:1700, normal:1950, high:2250},
+      "65-74": {low:1650, normal:1850, high:2050},
+      "75+":   {low:1450, normal:1750, high:null}
+    }
+  },
+  fiber: {
+    male:   {"18-29":20, "30-49":22, "50-64":22, "65-74":21, "75+":20},
+    female: {"18-29":18, "30-49":18, "50-64":18, "65-74":18, "75+":17}
+  }
+};
+function adultAgeBand(age){
+  age=Number(age);
+  if(!Number.isFinite(age) || age<18) return null;
+  if(age<=29) return "18-29";
+  if(age<=49) return "30-49";
+  if(age<=64) return "50-64";
+  if(age<=74) return "65-74";
+  return "75+";
+}
+function applyOfficialReference(){
+  const age=Number(profileAge.value), sex=profileSex.value, activity=profileActivity.value;
+  const band=adultAgeBand(age);
+  if(!band){alert("自動設定は18歳以上に対応しています。年齢を確認してください。");return false;}
+  const kcal=OFFICIAL_2025.energy[sex][band][activity];
+  if(kcal==null){
+    alert("75歳以上の『高い』については、2025年版の参考表に基準値が設定されていません。『低い』または『ふつう』を選んでください。");
+    return false;
+  }
+  const fiber=OFFICIAL_2025.fiber[sex][band];
+  targetKcal.value=kcal;
+  targetFiber.value=fiber;
+  referenceResult.innerHTML=`<b>${age}歳・${sex==="female"?"女性":"男性"}・活動量 ${activity==="low"?"低い":activity==="normal"?"ふつう":"高い"}</b><br>1日のカロリー目安：${kcal.toLocaleString()} kcal<br>食物繊維目安：${fiber} g<br><span style="font-size:10px">基準：厚生労働省「日本人の食事摂取基準（2025年版）」</span>`;
+  return true;
+}
+function setIntakeMode(mode){
+  autoModeBtn.classList.toggle("active",mode==="auto");
+  manualModeBtn.classList.toggle("active",mode==="manual");
+  autoSettingsBox.style.display=mode==="auto"?"block":"none";
+  manualSettingsBox.style.display=mode==="manual"?"block":"none";
+}
+function setGutDetailMode(mode){
+  gutDetailBox.style.display=mode==="on"?"block":"none";
+}
 function render(){
   const key=keyOf(currentDate), items=itemsToday(), s=state.settings;
   document.getElementById("dateLabel").textContent=fmtDate(currentDate);
@@ -373,23 +502,24 @@ function render(){
   document.getElementById("kcalHint").textContent=`目安 ${s.targetKcal} kcal（設定で変更可）`;
 
   const fiberScore=40*clamp(fiber/s.targetFiber,0,1);
-  const plantScore=25*clamp(plants/s.targetPlants,0,1);
-  const fermentScore=20*clamp(ferment/s.targetFerment,0,1);
+  const detailOn=s.gutDetail!==false;
+  const plantScore=detailOn?25*clamp(plants/s.targetPlants,0,1):0;
+  const fermentScore=detailOn?20*clamp(ferment/s.targetFerment,0,1):0;
   const preScore=15*clamp(prebiotic/2,0,1);
-  const gut=Math.round(fiberScore+plantScore+fermentScore+preScore);
+  const gut=Math.round(detailOn?(fiberScore+plantScore+fermentScore+preScore):(fiberScore+preScore));
   document.getElementById("gutScore").textContent=gut;
   document.getElementById("fiberChip").textContent=`食物繊維 ${fiber ? fiber.toFixed(1) : "0"}g`;
-  document.getElementById("plantChip").textContent=`植物 ${plants}種`;
-  document.getElementById("fermentChip").textContent=`発酵 ${ferment}品`;
+  document.getElementById("plantChip").textContent=detailOn?`植物 ${plants}種`:"植物 詳細OFF";
+  document.getElementById("fermentChip").textContent=detailOn?`発酵 ${ferment}品`:"発酵 詳細OFF";
 
   setNutri("fiber", fiber, s.targetFiber, "g");
   document.getElementById("proteinValue").textContent=protein ? `${protein.toFixed(1)} g` : "—";
   document.getElementById("proteinStatus").textContent=protein ? "記録分の合計" : "判定材料がまだ少ない";
   document.getElementById("proteinStatus").className="status "+(protein?"good":"muted");
-  document.getElementById("fermentValue").textContent=`${ferment} 品`;
-  setStatus("fermentStatus", ferment>=s.targetFerment?"十分":ferment>0?"もう少し":"まだ少なめ", ferment>=s.targetFerment?"good":ferment>0?"warn":"muted");
-  document.getElementById("plantValue").textContent=`${plants} 種`;
-  setStatus("plantStatus", plants>=s.targetPlants?"十分":plants>=Math.ceil(s.targetPlants/2)?"もう少し":"まだ少なめ", plants>=s.targetPlants?"good":plants?"warn":"muted");
+  document.getElementById("fermentValue").textContent=detailOn?`${ferment} 品`:"—";
+  setStatus("fermentStatus", detailOn?(ferment>=s.targetFerment?"十分":ferment>0?"もう少し":"まだ少なめ"):"詳細チェックOFF", detailOn?(ferment>=s.targetFerment?"good":ferment>0?"warn":"muted"):"muted");
+  document.getElementById("plantValue").textContent=detailOn?`${plants} 種`:"—";
+  setStatus("plantStatus", detailOn?(plants>=s.targetPlants?"十分":plants>=Math.ceil(s.targetPlants/2)?"もう少し":"まだ少なめ"):"詳細チェックOFF", detailOn?(plants>=s.targetPlants?"good":plants?"warn":"muted"):"muted");
 
   const list=document.getElementById("mealList");
   if(!items.length) list.innerHTML='<div class="empty">まだ記録がありません。<br>下の「写真から追加」から始めましょう。</div>';
@@ -426,9 +556,11 @@ function makeAdvice(items,t,s){
   if(t.fiber < s.targetFiber*.6) bits.push("食物繊維は少なめ。豆・きのこ・海藻・野菜・果物のどれかを足せると◎");
   else if(t.fiber < s.targetFiber) bits.push("食物繊維はあと少し。無理に帳尻を合わせず、次の食事で一品足すくらいで十分");
   else bits.push("食物繊維はしっかり取れています");
-  if(t.plants < s.targetPlants*.5) bits.push("植物性食品の種類が少なめなので、少量ずつ種類を増やすと腸活の幅が広がります");
-  else if(t.plants >= s.targetPlants) bits.push("植物性食品の種類もいい感じです");
-  if(t.ferment===0) bits.push("発酵食品はまだ0。味噌・ヨーグルト・納豆など、いつもの一品で十分です");
+  if(s.gutDetail!==false){
+    if(t.plants < s.targetPlants*.5) bits.push("植物性食品の種類が少なめなので、少量ずつ種類を増やすと腸活の幅が広がります");
+    else if(t.plants >= s.targetPlants) bits.push("植物性食品の種類もいい感じです");
+    if(t.ferment===0) bits.push("発酵食品はまだ0。味噌・ヨーグルト・納豆など、いつもの一品で十分です");
+  }
   return bits.slice(0,3).join("。")+"。";
 }
 function escapeHtml(s){
@@ -449,12 +581,27 @@ document.getElementById("settingsBtn").onclick=()=>{
   targetFiber.value=s.targetFiber;
   targetPlants.value=s.targetPlants;
   targetFerment.value=s.targetFerment;
+  profileAge.value=s.age||"";
+  profileSex.value=s.sex||"female";
+  profileActivity.value=s.activity||"normal";
+  gutDetailMode.value=s.gutDetail===false?"off":"on";
   photoSaveMode.value=s.saveToPhotos?"on":"off";
   deleteAfterExportMode.value=s.deleteAfterExport?"on":"off";
+  setIntakeMode(s.intakeMode||"manual");
+  setGutDetailMode(s.gutDetail===false?"off":"on");
+  referenceResult.innerHTML=s.intakeMode==="auto"&&s.age?`現在の自動設定：${s.age}歳・${s.sex==="female"?"女性":"男性"}・活動量 ${s.activity==="low"?"低い":s.activity==="normal"?"ふつう":"高い"}<br>カロリー ${s.targetKcal} kcal / 食物繊維 ${s.targetFiber} g`:"年齢・性別・活動量を選んで「基準値から設定する」を押してください。";
   settingsDialog.showModal();
 };
 document.getElementById("aboutScore").onclick=()=>aboutDialog.showModal();
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
+
+autoModeBtn.onclick=()=>setIntakeMode("auto");
+manualModeBtn.onclick=()=>setIntakeMode("manual");
+gutDetailMode.onchange=()=>setGutDetailMode(gutDetailMode.value);
+applyReferenceValues.onclick=()=>{ if(applyOfficialReference()) setIntakeMode("auto"); };
+profileAge.onchange=()=>{if(autoModeBtn.classList.contains("active")) applyOfficialReference();};
+profileSex.onchange=()=>{if(autoModeBtn.classList.contains("active") && profileAge.value) applyOfficialReference();};
+profileActivity.onchange=()=>{if(autoModeBtn.classList.contains("active") && profileAge.value) applyOfficialReference();};
 
 function setEntryType(t){
   entryType=t;
@@ -505,11 +652,19 @@ function resetForm(){
   foodFerment.checked=false;foodPrebiotic.checked=false;photoInput.value="";photoPreview.style.display="none";pendingImage="";
 }
 saveSettings.onclick=()=>{
+  const intakeMode=autoModeBtn.classList.contains("active")?"auto":"manual";
+  if(intakeMode==="auto" && !applyOfficialReference()) return;
   state.settings={
     targetKcal:Number(targetKcal.value||1800),
     targetFiber:Number(targetFiber.value||18),
     targetPlants:Number(targetPlants.value||10),
     targetFerment:Number(targetFerment.value||2),
+    intakeMode,
+    age:profileAge.value,
+    sex:profileSex.value,
+    activity:profileActivity.value,
+    gutDetail:gutDetailMode.value==="on",
+    referenceVersion:"2025",
     saveToPhotos: photoSaveMode.value==="on",
     deleteAfterExport: deleteAfterExportMode.value==="on"
   };
