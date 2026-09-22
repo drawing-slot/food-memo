@@ -100,6 +100,8 @@
   .activityitem{background:#fffdf9;border:1px solid var(--line);border-radius:11px;padding:9px 10px;font-size:11px;line-height:1.55;color:var(--muted)}
   .activityitem b{color:var(--ink);font-size:12px}
   .sourcebox{font-size:11px;color:var(--muted);line-height:1.55;background:#f7f4ec;border-radius:10px;padding:9px 10px;margin-top:8px}
+  .unitrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+  .unitsuffix{font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap}
   @media (max-width:390px){.hero{grid-template-columns:1fr} .nutrients{grid-template-columns:1fr}}
 </style>
 </head>
@@ -227,8 +229,7 @@
           <div class="activityitem"><b>高い</b>　移動や立ち仕事が多い、または運動習慣がしっかりある</div>
         </div>
       </div>
-      <button class="secondary" id="applyReferenceValues" type="button">基準値から設定する</button>
-      <div id="referenceResult" class="sourcebox">年齢・性別・活動量を選んで「基準値から設定する」を押してください。</div>
+      <div id="referenceResult" class="sourcebox">年齢・性別・活動量を入力すると、基準値が自動で反映されます。</div>
     </div>
 
     <div id="manualSettingsBox" class="modebox">
@@ -252,15 +253,46 @@
 
     <div id="gutDetailBox" class="modebox">
       <div class="field">
-        <label>植物性食品の種類</label>
-        <div class="subnote">いろいろな植物性食品を食べることで、食物繊維や腸内細菌のえさになる成分の種類も増やしやすくなります。</div>
-        <input id="targetPlants" type="number" min="1" placeholder="アプリ内の目安">
+        <label>1日の植物性食品の目安</label>
+        <div class="subnote">1日に食べた植物性食品の「種類数」を見ます。数を競うものではなく、食事の多様性を見るための目安です。</div>
+        <div class="unitrow">
+          <select id="targetPlants">
+            <option value="">選んでください</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+          <span class="unitsuffix">種類 / 日</span>
+        </div>
       </div>
       <div class="field">
-        <label>発酵食品</label>
-        <div class="subnote">発酵食品は腸活のひとつの選択肢です。厳密なノルマではなく、日々取り入れられているかを見るための目安として使います。</div>
-        <input id="targetFerment" type="number" min="1" placeholder="アプリ内の目安">
+        <label>1日の発酵食品の目安</label>
+        <div class="subnote">1日に取り入れた発酵食品の「品数」を見ます。厳密なノルマではなく、日々取り入れられているかを見るための目安です。</div>
+        <div class="unitrow">
+          <select id="targetFerment">
+            <option value="">選んでください</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+          <span class="unitsuffix">品 / 日</span>
+        </div>
       </div>
+      <div class="tiny">※ この2つは国の公式な摂取基準ではなく、このアプリで食事の多様性を見るために自分で決める目安です。</div>
     </div>
 
     <div class="sectionlabel">データ処理の設定</div>
@@ -327,8 +359,9 @@ const storageKey = "kyou-tabeta-memo-v1";
 const defaultSettings = {
   targetKcal: 1800,
   targetFiber: 18,
-  targetPlants: 10,
-  targetFerment: 2,
+  targetPlants: null,
+  targetFerment: null,
+  gutTargetsConfigured: false,
   intakeMode: "manual",
   age: "",
   sex: "female",
@@ -381,6 +414,13 @@ function normalizeState(raw){
   const base=structuredClone(defaultState);
   if(!raw||typeof raw!=="object") return base;
   const settings={...defaultSettings,...(raw.settings||{})};
+  // v2.5: the old 10/2 values were app defaults, not official recommendations.
+  // Existing installs that never explicitly configured these targets start unconfigured.
+  if(raw.settings && raw.settings.gutTargetsConfigured===undefined){
+    settings.targetPlants=null;
+    settings.targetFerment=null;
+    settings.gutTargetsConfigured=false;
+  }
   const days=raw.days&&typeof raw.days==="object"?raw.days:base.days;
   return {settings,days};
 }
@@ -503,8 +543,10 @@ function render(){
 
   const fiberScore=40*clamp(fiber/s.targetFiber,0,1);
   const detailOn=s.gutDetail!==false;
-  const plantScore=detailOn?25*clamp(plants/s.targetPlants,0,1):0;
-  const fermentScore=detailOn?20*clamp(ferment/s.targetFerment,0,1):0;
+  const plantTarget=Number(s.targetPlants)||0;
+  const fermentTarget=Number(s.targetFerment)||0;
+  const plantScore=detailOn&&plantTarget?25*clamp(plants/plantTarget,0,1):0;
+  const fermentScore=detailOn&&fermentTarget?20*clamp(ferment/fermentTarget,0,1):0;
   const preScore=15*clamp(prebiotic/2,0,1);
   const gut=Math.round(detailOn?(fiberScore+plantScore+fermentScore+preScore):(fiberScore+preScore));
   document.getElementById("gutScore").textContent=gut;
@@ -517,9 +559,9 @@ function render(){
   document.getElementById("proteinStatus").textContent=protein ? "記録分の合計" : "判定材料がまだ少ない";
   document.getElementById("proteinStatus").className="status "+(protein?"good":"muted");
   document.getElementById("fermentValue").textContent=detailOn?`${ferment} 品`:"—";
-  setStatus("fermentStatus", detailOn?(ferment>=s.targetFerment?"十分":ferment>0?"もう少し":"まだ少なめ"):"詳細チェックOFF", detailOn?(ferment>=s.targetFerment?"good":ferment>0?"warn":"muted"):"muted");
+  setStatus("fermentStatus", !detailOn?"詳細チェックOFF":!fermentTarget?"目安未設定":(ferment>=fermentTarget?"十分":ferment>0?"もう少し":"まだ少なめ"), !detailOn||!fermentTarget?"muted":(ferment>=fermentTarget?"good":ferment>0?"warn":"muted"));
   document.getElementById("plantValue").textContent=detailOn?`${plants} 種`:"—";
-  setStatus("plantStatus", detailOn?(plants>=s.targetPlants?"十分":plants>=Math.ceil(s.targetPlants/2)?"もう少し":"まだ少なめ"):"詳細チェックOFF", detailOn?(plants>=s.targetPlants?"good":plants?"warn":"muted"):"muted");
+  setStatus("plantStatus", !detailOn?"詳細チェックOFF":!plantTarget?"目安未設定":(plants>=plantTarget?"十分":plants>=Math.ceil(plantTarget/2)?"もう少し":"まだ少なめ"), !detailOn||!plantTarget?"muted":(plants>=plantTarget?"good":plants?"warn":"muted"));
 
   const list=document.getElementById("mealList");
   if(!items.length) list.innerHTML='<div class="empty">まだ記録がありません。<br>下の「写真から追加」から始めましょう。</div>';
@@ -557,9 +599,12 @@ function makeAdvice(items,t,s){
   else if(t.fiber < s.targetFiber) bits.push("食物繊維はあと少し。無理に帳尻を合わせず、次の食事で一品足すくらいで十分");
   else bits.push("食物繊維はしっかり取れています");
   if(s.gutDetail!==false){
-    if(t.plants < s.targetPlants*.5) bits.push("植物性食品の種類が少なめなので、少量ずつ種類を増やすと腸活の幅が広がります");
-    else if(t.plants >= s.targetPlants) bits.push("植物性食品の種類もいい感じです");
-    if(t.ferment===0) bits.push("発酵食品はまだ0。味噌・ヨーグルト・納豆など、いつもの一品で十分です");
+    const pTarget=Number(s.targetPlants)||0, fTarget=Number(s.targetFerment)||0;
+    if(pTarget){
+      if(t.plants < pTarget*.5) bits.push("植物性食品の種類が少なめなので、少量ずつ種類を増やすと腸活の幅が広がります");
+      else if(t.plants >= pTarget) bits.push("植物性食品の種類もいい感じです");
+    }
+    if(fTarget && t.ferment===0) bits.push("発酵食品はまだ0。味噌・ヨーグルト・納豆など、いつもの一品で十分です");
   }
   return bits.slice(0,3).join("。")+"。";
 }
@@ -579,8 +624,8 @@ document.getElementById("settingsBtn").onclick=()=>{
   const s=state.settings;
   targetKcal.value=s.targetKcal;
   targetFiber.value=s.targetFiber;
-  targetPlants.value=s.targetPlants;
-  targetFerment.value=s.targetFerment;
+  targetPlants.value=s.targetPlants||"";
+  targetFerment.value=s.targetFerment||"";
   profileAge.value=s.age||"";
   profileSex.value=s.sex||"female";
   profileActivity.value=s.activity||"normal";
@@ -589,17 +634,19 @@ document.getElementById("settingsBtn").onclick=()=>{
   deleteAfterExportMode.value=s.deleteAfterExport?"on":"off";
   setIntakeMode(s.intakeMode||"manual");
   setGutDetailMode(s.gutDetail===false?"off":"on");
-  referenceResult.innerHTML=s.intakeMode==="auto"&&s.age?`現在の自動設定：${s.age}歳・${s.sex==="female"?"女性":"男性"}・活動量 ${s.activity==="low"?"低い":s.activity==="normal"?"ふつう":"高い"}<br>カロリー ${s.targetKcal} kcal / 食物繊維 ${s.targetFiber} g`:"年齢・性別・活動量を選んで「基準値から設定する」を押してください。";
+  referenceResult.innerHTML=s.intakeMode==="auto"&&s.age?`<b>${s.age}歳・${s.sex==="female"?"女性":"男性"}・活動量 ${s.activity==="low"?"低い":s.activity==="normal"?"ふつう":"高い"}</b><br>1日のカロリー目安：${Number(s.targetKcal).toLocaleString()} kcal<br>食物繊維目安：${s.targetFiber} g<br><span style="font-size:10px">基準：厚生労働省「日本人の食事摂取基準（2025年版）」</span>`:"年齢・性別・活動量を入力すると、基準値が自動で反映されます。";
   settingsDialog.showModal();
 };
 document.getElementById("aboutScore").onclick=()=>aboutDialog.showModal();
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).close());
 
-autoModeBtn.onclick=()=>setIntakeMode("auto");
+autoModeBtn.onclick=()=>{
+  setIntakeMode("auto");
+  if(profileAge.value) applyOfficialReference();
+};
 manualModeBtn.onclick=()=>setIntakeMode("manual");
 gutDetailMode.onchange=()=>setGutDetailMode(gutDetailMode.value);
-applyReferenceValues.onclick=()=>{ if(applyOfficialReference()) setIntakeMode("auto"); };
-profileAge.onchange=()=>{if(autoModeBtn.classList.contains("active")) applyOfficialReference();};
+profileAge.oninput=()=>{if(autoModeBtn.classList.contains("active") && Number(profileAge.value)>=18) applyOfficialReference();};
 profileSex.onchange=()=>{if(autoModeBtn.classList.contains("active") && profileAge.value) applyOfficialReference();};
 profileActivity.onchange=()=>{if(autoModeBtn.classList.contains("active") && profileAge.value) applyOfficialReference();};
 
@@ -654,16 +701,22 @@ function resetForm(){
 saveSettings.onclick=()=>{
   const intakeMode=autoModeBtn.classList.contains("active")?"auto":"manual";
   if(intakeMode==="auto" && !applyOfficialReference()) return;
+  const gutOn=gutDetailMode.value==="on";
+  if(gutOn && (!targetPlants.value || !targetFerment.value)){
+    alert("腸活の詳細チェックを使う場合は、植物性食品と発酵食品の1日の目安を選んでください。");
+    return;
+  }
   state.settings={
     targetKcal:Number(targetKcal.value||1800),
     targetFiber:Number(targetFiber.value||18),
-    targetPlants:Number(targetPlants.value||10),
-    targetFerment:Number(targetFerment.value||2),
+    targetPlants:gutOn?Number(targetPlants.value):null,
+    targetFerment:gutOn?Number(targetFerment.value):null,
+    gutTargetsConfigured:gutOn,
     intakeMode,
     age:profileAge.value,
     sex:profileSex.value,
     activity:profileActivity.value,
-    gutDetail:gutDetailMode.value==="on",
+    gutDetail:gutOn,
     referenceVersion:"2025",
     saveToPhotos: photoSaveMode.value==="on",
     deleteAfterExport: deleteAfterExportMode.value==="on"
