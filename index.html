@@ -202,7 +202,25 @@
     <div class="note" id="storageNote"></div>
 
     <div id="analysisBox" class="analysisbox">
-      <div id="analysisStatus" class="analysisstatus">写真を選ぶと、ここにざっくり判定を表示します。</div>
+      <div id="analysisStatus" class="analysisstatus">写真を選んだら、ChatGPTで写真をざっくり解析して、結果をここに貼り付けます。</div>
+
+      <div id="pasteAnalysisArea" class="modebox" style="display:none;margin-top:10px">
+        <div class="resultlabel">ChatGPTの解析結果を貼り付け</div>
+        <div class="tiny">この写真をChatGPTに送って「今日食べたものメモ用に解析して」と頼み、返ってきた結果をそのまま貼り付けます。</div>
+        <textarea id="analysisPaste" rows="8" placeholder="例：
+料理名：きのこ炒飯
+カロリー：約500 kcal
+食物繊維：約5 g
+たんぱく質：約14 g
+植物性食品：5種類
+発酵食品：なし
+腸活食材：あり"></textarea>
+        <div class="grid2" style="margin-top:8px">
+          <button class="secondary" id="copyAnalysisPrompt" type="button">ChatGPT用のお願い文をコピー</button>
+          <button class="primary" id="applyPastedAnalysis" type="button">貼り付け内容を反映</button>
+        </div>
+        <div class="tiny" id="pasteParseStatus"></div>
+      </div>
 
       <div class="resultrow">
         <div>
@@ -222,13 +240,13 @@
 
       <button class="secondary" id="toggleExtra" type="button" style="margin-top:0">＋ 写真にない単品を追加</button>
       <div id="extraArea" class="extras" style="display:none">
-        <div class="tiny" style="margin-top:0">海苔・梅干し・ヨーグルト・果物など、1つずつ追加できます。料理やスープは別の写真で記録してください。</div>
+        <div class="tiny" style="margin-top:0">海苔・梅干し・ヨーグルト・果物など、写真にない単品を1つずつ追加できます。料理やスープは別の写真で記録してください。追加した単品は名前を記録します。</div>
         <div class="extraform"><input id="extraInput" placeholder="例：海苔、梅干し、バナナ"><button id="addExtra" type="button">追加</button></div>
         <div id="extraList" class="extralist"></div>
       </div>
 
       <details class="manualfallback">
-        <summary>AI未接続時の仮入力（必要なときだけ）</summary>
+        <summary>解析結果がうまく読めないときだけ手入力</summary>
         <div class="grid2" style="margin-top:10px">
           <div class="field"><label>カロリー（kcal）</label><input id="foodKcal" type="number" inputmode="decimal" placeholder="ざっくり"></div>
           <div class="field"><label>食物繊維（g）</label><input id="foodFiber" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
@@ -243,7 +261,7 @@
 
       <button class="primary" id="saveFood" style="margin-top:12px">この内容で記録</button>
       <button class="secondary" id="fillDemo">入力例で試す</button>
-      <div class="tiny">※ 栄養値はざっくり推定用です。料理名と食べた量だけ軽く確認して記録する設計です。</div>
+      <div class="tiny">※ 栄養値はざっくり把握用です。細かい修正はせず、料理名と食べた量だけ軽く確認して記録する設計です。</div>
     </div>
   </div>
 </dialog>
@@ -347,6 +365,7 @@
       </div>
       <div class="tiny">※ この2つは国の公式な摂取基準ではなく、このアプリで食事の多様性を見るために自分で決める目安です。</div>
     </div>
+
 
     <div class="sectionlabel">データ処理の設定</div>
     <div class="field">
@@ -452,8 +471,6 @@ let pendingExportCleanup = null;
 let selectedAmount = 1;
 let extraItems = [];
 let pendingAnalysis = null;
-// 実際の画像認識をつなぐときは、安全なサーバー側エンドポイントを設定します。
-const AI_ANALYZE_ENDPOINT = "";
 
 
 const PHOTO_DB="food-memo-photos-v1", PHOTO_STORE="photos";
@@ -517,7 +534,7 @@ function storageNoteText(){
   const part2=s.deleteAfterExport
     ? "週間まとめを書き出したあと、このアプリ内のデータと写真を削除できます。"
     : "週間まとめを書き出したあとも、このアプリ内のデータと写真を残します。";
-  return `<b>ローカル保存版：</b> ${part1} ${part2} 自炊写真も市販品の成分表示写真も同じルールで扱います。AI写真解析の画面と記録ロジックは準備済みです。画像認識そのものは解析サービス接続後に動きます。`;
+  return `<b>ローカル保存版：</b> ${part1} ${part2} 自炊写真も市販品の成分表示写真も同じルールで扱います。写真はこのアプリから外部の解析サービスへ自動送信しません。通常の記録データはこのiPhone内に保存します。`;
 }
 function recordPhotoNote(){
   return state.settings.deleteAfterExport
@@ -722,7 +739,7 @@ photoInput.onchange=async(e)=>{
   photoPreview.src=pendingImage; photoPreview.style.display="block";
   resetAnalysisReview();
   analysisBox.classList.add("show");
-  await analyzeSelectedPhoto();
+  preparePasteAnalysis();
 };
 function resizeImage(file,max,q){
   return new Promise((resolve,reject)=>{
@@ -743,31 +760,64 @@ function resetAnalysisReview(){
   editDishName.textContent="修正する";
   extraArea.style.display="none";
   extraInput.value="";
+  if(typeof pasteAnalysisArea!=="undefined") pasteAnalysisArea.style.display="none";
+  if(typeof analysisPaste!=="undefined") analysisPaste.value="";
+  if(typeof pasteParseStatus!=="undefined") pasteParseStatus.textContent="";
   renderExtraItems();
   [foodKcal,foodFiber,foodProtein,foodPlants].forEach(x=>x.value="");
   foodFerment.checked=false; foodPrebiotic.checked=false;
 }
-async function analyzeSelectedPhoto(){
-  analysisStatus.textContent="写真を確認しています…";
-  if(!AI_ANALYZE_ENDPOINT){
-    analysisStatus.innerHTML='画像認識サービスはまだ未接続です。今はこの確認画面を試せます。<br><b>料理名だけ入力</b>して記録するか、「入力例で試す」で動きを確認できます。';
-    dishNameDisplay.textContent="料理名を入力してください";
-    dishNameEdit.classList.add("show");
-    editDishName.textContent="閉じる";
-    return;
-  }
-  try{
-    const res=await fetch(AI_ANALYZE_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:pendingImage,type:entryType})});
-    if(!res.ok) throw new Error("analysis failed");
-    const data=await res.json();
-    applyAnalysisResult(data);
-    analysisStatus.textContent="AIのざっくり判定です。料理名と食べた量だけ確認してください。";
-  }catch(e){
-    analysisStatus.textContent="解析できませんでした。料理名だけ入力して記録できます。";
-    dishNameDisplay.textContent="料理名を入力してください";
-    dishNameEdit.classList.add("show");
-  }
+function preparePasteAnalysis(){
+  analysisStatus.innerHTML='写真を選びました。<b>ChatGPTでこの写真を解析</b>して、結果を下に貼り付けてください。';
+  pasteAnalysisArea.style.display="block";
+  analysisPaste.value="";
+  pasteParseStatus.textContent="";
+  dishNameDisplay.textContent="解析結果を貼り付けてください";
 }
+
+const ANALYSIS_PROMPT=`この写真を「今日食べたものメモ」用に、ざっくり解析してください。厳密な栄養計算ではなく、写真に写っているものを全部食べた前提の目安でOKです。必ず次の形式で返してください。
+料理名：
+カロリー：約○○ kcal
+食物繊維：約○○ g
+たんぱく質：約○○ g
+植物性食品：○種類
+発酵食品：あり / なし
+腸活食材：あり / なし`;
+
+copyAnalysisPrompt.onclick=async()=>{
+  try{await navigator.clipboard.writeText(ANALYSIS_PROMPT);pasteParseStatus.textContent="お願い文をコピーしました。ChatGPTに写真と一緒に送ってください。";}
+  catch(e){prompt("この文章をコピーしてください",ANALYSIS_PROMPT)}
+};
+
+applyPastedAnalysis.onclick=()=>{
+  const parsed=parsePastedAnalysis(analysisPaste.value);
+  if(!parsed.name){pasteParseStatus.textContent="料理名を読み取れませんでした。ChatGPTの結果をそのまま貼り付けてみてください。";return;}
+  applyAnalysisResult(parsed);
+  analysisStatus.textContent="ChatGPTのざっくり判定を反映しました。料理名と食べた量だけ確認してください。";
+  pasteParseStatus.textContent="反映しました。";
+};
+
+function parsePastedAnalysis(text){
+  const t=String(text||"").replace(/[＊*#`]/g,"").trim();
+  const line=(...labels)=>{
+    for(const label of labels){
+      const m=t.match(new RegExp(label+"\s*[：:]\s*([^\n\r]+)","i"));
+      if(m) return m[1].trim();
+    }
+    return "";
+  };
+  const num=(s)=>{const m=String(s||"").replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
+  const yes=(s)=>/あり|有|yes|true|含む|ある/i.test(String(s||""))&&!/なし|無|false|ない/i.test(String(s||""));
+  const name=line("料理名","食品名","商品名","名前");
+  const kcal=num(line("カロリー","エネルギー","kcal"));
+  const fiber=num(line("食物繊維","繊維"));
+  const protein=num(line("たんぱく質","タンパク質","蛋白質"));
+  const plants=num(line("植物性食品","植物性食材","植物由来食品"));
+  const fermentText=line("発酵食品","発酵");
+  const preText=line("腸活食材","プレバイオティクス");
+  return {name,kcal:kcal??0,fiber,protein,plants:plants??0,ferment:yes(fermentText),prebiotic:yes(preText)};
+}
+
 function applyAnalysisResult(data){
   pendingAnalysis={
     name:String(data.name||"料理"),
@@ -804,17 +854,22 @@ extraInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault()
 function addExtraItem(){
   const v=extraInput.value.trim();
   if(!v)return;
-  extraItems.push(v); extraInput.value=""; renderExtraItems();
+  const item={name:v,kcal:0,fiber:null,protein:null,plants:0,ferment:false,prebiotic:false,status:"plain"};
+  extraItems.push(item); extraInput.value=""; renderExtraItems();
 }
 function renderExtraItems(){
-  extraList.innerHTML=extraItems.map((x,i)=>`<span class="extrachip">${escapeHtml(x)} <button type="button" onclick="removeExtra(${i})">×</button></span>`).join("");
+  extraList.innerHTML=extraItems.map((x,i)=>{
+    const item=typeof x==="string"?{name:x,status:"plain"}:x;
+    const suffix=item.status==="pending"?" <small>解析中…</small>":"";
+    return `<span class="extrachip">${escapeHtml(item.name)}${suffix} <button type="button" onclick="removeExtra(${i})">×</button></span>`;
+  }).join("");
 }
 window.removeExtra=(i)=>{extraItems.splice(i,1);renderExtraItems();};
 
 fillDemo.onclick=()=>{
   analysisBox.classList.add("show");
   applyAnalysisResult({name:"きのこ炒飯",kcal:500,fiber:5,protein:14,plants:5,ferment:false,prebiotic:true});
-  analysisStatus.textContent="AIのざっくり判定（入力例）です。料理名と食べた量だけ確認してください。";
+  analysisStatus.textContent="ChatGPT解析結果の入力例です。料理名と食べた量だけ確認してください。";
 };
 saveFood.onclick=async()=>{
   const name=foodName.value.trim(); if(!name){alert("料理名だけ確認してください");return}
@@ -824,15 +879,24 @@ saveFood.onclick=async()=>{
   if(keepPhoto) await putPhoto(id,pendingImage);
   const mult=selectedAmount;
   const baseKcal=Number(foodKcal.value||0), baseFiber=foodFiber.value===""?null:Number(foodFiber.value), baseProtein=foodProtein.value===""?null:Number(foodProtein.value);
+  const normalizedExtras=extraItems.map(x=>typeof x==="string"?{name:x,kcal:0,fiber:null,protein:null,plants:0,ferment:false,prebiotic:false}:x);
+  const extraKcal=normalizedExtras.reduce((a,x)=>a+Number(x.kcal||0),0);
+  const extraFiber=normalizedExtras.reduce((a,x)=>a+(x.fiber==null?0:Number(x.fiber||0)),0);
+  const extraProtein=normalizedExtras.reduce((a,x)=>a+(x.protein==null?0:Number(x.protein||0)),0);
+  const extraPlants=normalizedExtras.reduce((a,x)=>a+Number(x.plants||0),0);
+  const extraFerment=normalizedExtras.filter(x=>x.ferment).length;
+  const extraPrebiotic=normalizedExtras.some(x=>x.prebiotic);
   const amountLabel=mult===1?"全部":mult===0.5?"半分":"少し";
+  const scaledFiber=baseFiber==null?null:Number((baseFiber*mult).toFixed(1));
+  const scaledProtein=baseProtein==null?null:Number((baseProtein*mult).toFixed(1));
   state.days[k].push({
     id, type:entryType, name,
-    kcal:Math.round(baseKcal*mult),
-    fiber:baseFiber==null?null:Number((baseFiber*mult).toFixed(1)),
-    protein:baseProtein==null?null:Number((baseProtein*mult).toFixed(1)),
-    plants:Number(foodPlants.value||0), ferment:foodFerment.checked, prebiotic:foodPrebiotic.checked,
-    extras:[...extraItems], amount:amountLabel,
-    hasImage:keepPhoto, image:"", note:[`量：${amountLabel}`,extraItems.length?`追加：${extraItems.join("・")}`:"",recordPhotoNote()].filter(Boolean).join(" · ")
+    kcal:Math.round(baseKcal*mult+extraKcal),
+    fiber:(scaledFiber==null && extraFiber===0)?null:Number(((scaledFiber||0)+extraFiber).toFixed(1)),
+    protein:(scaledProtein==null && extraProtein===0)?null:Number(((scaledProtein||0)+extraProtein).toFixed(1)),
+    plants:Number(foodPlants.value||0)+extraPlants, ferment:foodFerment.checked||extraFerment>0, prebiotic:foodPrebiotic.checked||extraPrebiotic,
+    extras:normalizedExtras.map(x=>x.name), amount:amountLabel,
+    hasImage:keepPhoto, image:"", note:[`量：${amountLabel}`,normalizedExtras.length?`追加：${normalizedExtras.map(x=>x.name).join("・")}`:"",recordPhotoNote()].filter(Boolean).join(" · ")
   });
   pendingImage="";
   saveState(); addDialog.close(); resetForm(); render();
