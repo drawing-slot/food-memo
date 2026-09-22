@@ -102,6 +102,29 @@
   .sourcebox{font-size:11px;color:var(--muted);line-height:1.55;background:#f7f4ec;border-radius:10px;padding:9px 10px;margin-top:8px}
   .unitrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
   .unitsuffix{font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap}
+  .analysisbox{display:none;margin-top:14px;background:#f8faf6;border:1px solid #dbe5d9;border-radius:18px;padding:14px}
+  .analysisbox.show{display:block}
+  .analysisstatus{font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+  .resultrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .resultrow:first-of-type{border-top:0;padding-top:0}
+  .resultlabel{font-size:12px;color:var(--muted);font-weight:700}
+  .dishname{font-size:17px;font-weight:850;margin-top:3px}
+  .editname{border:0;background:transparent;color:var(--green);font-weight:800;font-size:12px;white-space:nowrap}
+  .amounts{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:8px 0 12px}
+  .amounts button{border:1px solid var(--line);background:white;border-radius:12px;padding:10px 4px;font-weight:750;color:var(--ink)}
+  .amounts button.active{background:var(--green2);border-color:#bdcfbb;color:#35533b}
+  .extras{margin:10px 0}
+  .extraform{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
+  .extraform input{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}
+  .extraform button{border:1px solid var(--line);background:white;border-radius:12px;padding:9px 12px;font-weight:800;color:var(--green)}
+  .extralist{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .extrachip{display:inline-flex;align-items:center;gap:6px;background:white;border:1px solid var(--line);border-radius:999px;padding:6px 9px;font-size:12px}
+  .extrachip button{border:0;background:transparent;color:var(--muted);padding:0;font-size:14px}
+  .inlineedit{display:none;margin-top:7px}
+  .inlineedit.show{display:block}
+  .inlineedit input{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}
+  .manualfallback{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .manualfallback summary{font-size:12px;color:var(--muted);cursor:pointer}
   @media (max-width:390px){.hero{grid-template-columns:1fr} .nutrients{grid-template-columns:1fr}}
 </style>
 </head>
@@ -178,20 +201,50 @@
     </div>
     <div class="note" id="storageNote"></div>
 
-    <div class="field"><label>名前</label><input id="foodName" placeholder="例：豚肉と野菜炒め"></div>
-    <div class="grid2">
-      <div class="field"><label>カロリー（kcal）</label><input id="foodKcal" type="number" inputmode="decimal" placeholder="だいたいでOK"></div>
-      <div class="field"><label>食物繊維（g）</label><input id="foodFiber" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
-      <div class="field"><label>たんぱく質（g）</label><input id="foodProtein" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
-      <div class="field"><label>植物性食品の種類</label><input id="foodPlants" type="number" inputmode="numeric" placeholder="例：4"></div>
+    <div id="analysisBox" class="analysisbox">
+      <div id="analysisStatus" class="analysisstatus">写真を選ぶと、ここにざっくり判定を表示します。</div>
+
+      <div class="resultrow">
+        <div>
+          <div class="resultlabel">料理名</div>
+          <div id="dishNameDisplay" class="dishname">—</div>
+          <div id="dishNameEdit" class="inlineedit"><input id="foodName" placeholder="料理名を入力"></div>
+        </div>
+        <button id="editDishName" class="editname" type="button">修正する</button>
+      </div>
+
+      <div class="resultlabel" style="margin-top:10px">どのくらい食べた？</div>
+      <div class="amounts">
+        <button type="button" data-amount="1" class="active">全部</button>
+        <button type="button" data-amount="0.5">半分</button>
+        <button type="button" data-amount="0.25">少し</button>
+      </div>
+
+      <button class="secondary" id="toggleExtra" type="button" style="margin-top:0">＋ 写真にない単品を追加</button>
+      <div id="extraArea" class="extras" style="display:none">
+        <div class="tiny" style="margin-top:0">海苔・梅干し・ヨーグルト・果物など、1つずつ追加できます。料理やスープは別の写真で記録してください。</div>
+        <div class="extraform"><input id="extraInput" placeholder="例：海苔、梅干し、バナナ"><button id="addExtra" type="button">追加</button></div>
+        <div id="extraList" class="extralist"></div>
+      </div>
+
+      <details class="manualfallback">
+        <summary>AI未接続時の仮入力（必要なときだけ）</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="field"><label>カロリー（kcal）</label><input id="foodKcal" type="number" inputmode="decimal" placeholder="ざっくり"></div>
+          <div class="field"><label>食物繊維（g）</label><input id="foodFiber" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
+          <div class="field"><label>たんぱく質（g）</label><input id="foodProtein" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
+          <div class="field"><label>植物性食品の種類</label><input id="foodPlants" type="number" inputmode="numeric" placeholder="例：4"></div>
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" id="foodFerment"> 発酵食品</label>
+          <label class="check"><input type="checkbox" id="foodPrebiotic"> 腸活食材あり</label>
+        </div>
+      </details>
+
+      <button class="primary" id="saveFood" style="margin-top:12px">この内容で記録</button>
+      <button class="secondary" id="fillDemo">入力例で試す</button>
+      <div class="tiny">※ 栄養値はざっくり推定用です。料理名と食べた量だけ軽く確認して記録する設計です。</div>
     </div>
-    <div class="checks">
-      <label class="check"><input type="checkbox" id="foodFerment"> 発酵食品</label>
-      <label class="check"><input type="checkbox" id="foodPrebiotic"> 腸活食材あり</label>
-    </div>
-    <button class="primary" id="saveFood">この内容で追加</button>
-    <button class="secondary" id="fillDemo">入力例を入れてみる</button>
-    <div class="tiny">※ 健康管理のための目安です。写真推定は誤差を含む前提で設計しています。</div>
   </div>
 </dialog>
 
@@ -396,6 +449,11 @@ let currentDate = new Date();
 let entryType = "home";
 let pendingImage = "";
 let pendingExportCleanup = null;
+let selectedAmount = 1;
+let extraItems = [];
+let pendingAnalysis = null;
+// 実際の画像認識をつなぐときは、安全なサーバー側エンドポイントを設定します。
+const AI_ANALYZE_ENDPOINT = "";
 
 
 const PHOTO_DB="food-memo-photos-v1", PHOTO_STORE="photos";
@@ -459,7 +517,7 @@ function storageNoteText(){
   const part2=s.deleteAfterExport
     ? "週間まとめを書き出したあと、このアプリ内のデータと写真を削除できます。"
     : "週間まとめを書き出したあとも、このアプリ内のデータと写真を残します。";
-  return `<b>ローカル保存版：</b> ${part1} ${part2} 自炊写真も市販品の成分表示写真も同じルールで扱います。AI写真解析は次の段階で接続します。`;
+  return `<b>ローカル保存版：</b> ${part1} ${part2} 自炊写真も市販品の成分表示写真も同じルールで扱います。AI写真解析の画面と記録ロジックは準備済みです。画像認識そのものは解析サービス接続後に動きます。`;
 }
 function recordPhotoNote(){
   return state.settings.deleteAfterExport
@@ -654,7 +712,6 @@ function setEntryType(t){
   entryType=t;
   homeBtn.classList.toggle("active",t==="home");
   packBtn.classList.toggle("active",t==="pack");
-  foodName.placeholder=t==="home"?"例：豚肉と野菜炒め":"例：森永 コーヒー 240ml";
   updateStorageTexts();
 }
 homeBtn.onclick=()=>setEntryType("home"); packBtn.onclick=()=>setEntryType("pack");
@@ -663,6 +720,9 @@ photoInput.onchange=async(e)=>{
   const file=e.target.files[0]; if(!file)return;
   pendingImage=await resizeImage(file,720,.72);
   photoPreview.src=pendingImage; photoPreview.style.display="block";
+  resetAnalysisReview();
+  analysisBox.classList.add("show");
+  await analyzeSelectedPhoto();
 };
 function resizeImage(file,max,q){
   return new Promise((resolve,reject)=>{
@@ -674,29 +734,113 @@ function resizeImage(file,max,q){
     }; img.src=r.result}; r.onerror=reject; r.readAsDataURL(file);
   });
 }
+function resetAnalysisReview(){
+  selectedAmount=1; extraItems=[]; pendingAnalysis=null;
+  document.querySelectorAll("[data-amount]").forEach(b=>b.classList.toggle("active",b.dataset.amount==="1"));
+  dishNameDisplay.textContent="—";
+  foodName.value="";
+  dishNameEdit.classList.remove("show");
+  editDishName.textContent="修正する";
+  extraArea.style.display="none";
+  extraInput.value="";
+  renderExtraItems();
+  [foodKcal,foodFiber,foodProtein,foodPlants].forEach(x=>x.value="");
+  foodFerment.checked=false; foodPrebiotic.checked=false;
+}
+async function analyzeSelectedPhoto(){
+  analysisStatus.textContent="写真を確認しています…";
+  if(!AI_ANALYZE_ENDPOINT){
+    analysisStatus.innerHTML='画像認識サービスはまだ未接続です。今はこの確認画面を試せます。<br><b>料理名だけ入力</b>して記録するか、「入力例で試す」で動きを確認できます。';
+    dishNameDisplay.textContent="料理名を入力してください";
+    dishNameEdit.classList.add("show");
+    editDishName.textContent="閉じる";
+    return;
+  }
+  try{
+    const res=await fetch(AI_ANALYZE_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:pendingImage,type:entryType})});
+    if(!res.ok) throw new Error("analysis failed");
+    const data=await res.json();
+    applyAnalysisResult(data);
+    analysisStatus.textContent="AIのざっくり判定です。料理名と食べた量だけ確認してください。";
+  }catch(e){
+    analysisStatus.textContent="解析できませんでした。料理名だけ入力して記録できます。";
+    dishNameDisplay.textContent="料理名を入力してください";
+    dishNameEdit.classList.add("show");
+  }
+}
+function applyAnalysisResult(data){
+  pendingAnalysis={
+    name:String(data.name||"料理"),
+    kcal:Number(data.kcal||0),
+    fiber:data.fiber==null?null:Number(data.fiber),
+    protein:data.protein==null?null:Number(data.protein),
+    plants:Number(data.plants||0),
+    ferment:!!data.ferment,
+    prebiotic:!!data.prebiotic
+  };
+  foodName.value=pendingAnalysis.name;
+  dishNameDisplay.textContent=pendingAnalysis.name;
+  foodKcal.value=pendingAnalysis.kcal||"";
+  foodFiber.value=pendingAnalysis.fiber??"";
+  foodProtein.value=pendingAnalysis.protein??"";
+  foodPlants.value=pendingAnalysis.plants||"";
+  foodFerment.checked=pendingAnalysis.ferment;
+  foodPrebiotic.checked=pendingAnalysis.prebiotic;
+}
+editDishName.onclick=()=>{
+  const open=!dishNameEdit.classList.contains("show");
+  dishNameEdit.classList.toggle("show",open);
+  editDishName.textContent=open?"閉じる":"修正する";
+  if(open){foodName.focus(); foodName.select();}
+};
+foodName.oninput=()=>{dishNameDisplay.textContent=foodName.value.trim()||"料理名を入力してください";};
+document.querySelectorAll("[data-amount]").forEach(b=>b.onclick=()=>{
+  selectedAmount=Number(b.dataset.amount);
+  document.querySelectorAll("[data-amount]").forEach(x=>x.classList.toggle("active",x===b));
+});
+toggleExtra.onclick=()=>{extraArea.style.display=extraArea.style.display==="none"?"block":"none";};
+addExtra.onclick=()=>addExtraItem();
+extraInput.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addExtraItem();}});
+function addExtraItem(){
+  const v=extraInput.value.trim();
+  if(!v)return;
+  extraItems.push(v); extraInput.value=""; renderExtraItems();
+}
+function renderExtraItems(){
+  extraList.innerHTML=extraItems.map((x,i)=>`<span class="extrachip">${escapeHtml(x)} <button type="button" onclick="removeExtra(${i})">×</button></span>`).join("");
+}
+window.removeExtra=(i)=>{extraItems.splice(i,1);renderExtraItems();};
+
 fillDemo.onclick=()=>{
-  if(entryType==="pack"){foodName.value="市販の飲み物";foodKcal.value=120;foodFiber.value="";foodProtein.value=3.2;foodPlants.value=0;}
-  else{foodName.value="豚肉と野菜炒め";foodKcal.value=430;foodFiber.value=5.5;foodProtein.value=24;foodPlants.value=5;foodPrebiotic.checked=true;}
+  analysisBox.classList.add("show");
+  applyAnalysisResult({name:"きのこ炒飯",kcal:500,fiber:5,protein:14,plants:5,ferment:false,prebiotic:true});
+  analysisStatus.textContent="AIのざっくり判定（入力例）です。料理名と食べた量だけ確認してください。";
 };
 saveFood.onclick=async()=>{
-  const name=foodName.value.trim(); if(!name){alert("名前だけ入れてください");return}
+  const name=foodName.value.trim(); if(!name){alert("料理名だけ確認してください");return}
   const k=keyOf(currentDate); if(!state.days[k])state.days[k]=[];
   const id=Date.now().toString(36);
   const keepPhoto=!!pendingImage;
   if(keepPhoto) await putPhoto(id,pendingImage);
+  const mult=selectedAmount;
+  const baseKcal=Number(foodKcal.value||0), baseFiber=foodFiber.value===""?null:Number(foodFiber.value), baseProtein=foodProtein.value===""?null:Number(foodProtein.value);
+  const amountLabel=mult===1?"全部":mult===0.5?"半分":"少し";
   state.days[k].push({
     id, type:entryType, name,
-    kcal:Number(foodKcal.value||0), fiber:foodFiber.value===""?null:Number(foodFiber.value),
-    protein:foodProtein.value===""?null:Number(foodProtein.value),
+    kcal:Math.round(baseKcal*mult),
+    fiber:baseFiber==null?null:Number((baseFiber*mult).toFixed(1)),
+    protein:baseProtein==null?null:Number((baseProtein*mult).toFixed(1)),
     plants:Number(foodPlants.value||0), ferment:foodFerment.checked, prebiotic:foodPrebiotic.checked,
-    hasImage:keepPhoto, image:"", note:recordPhotoNote()
+    extras:[...extraItems], amount:amountLabel,
+    hasImage:keepPhoto, image:"", note:[`量：${amountLabel}`,extraItems.length?`追加：${extraItems.join("・")}`:"",recordPhotoNote()].filter(Boolean).join(" · ")
   });
   pendingImage="";
   saveState(); addDialog.close(); resetForm(); render();
 };
 function resetForm(){
-  [foodName,foodKcal,foodFiber,foodProtein,foodPlants].forEach(x=>x.value="");
-  foodFerment.checked=false;foodPrebiotic.checked=false;photoInput.value="";photoPreview.style.display="none";pendingImage="";
+  photoInput.value="";photoPreview.style.display="none";pendingImage="";
+  analysisBox.classList.remove("show");
+  resetAnalysisReview();
 }
 saveSettings.onclick=()=>{
   const intakeMode=autoModeBtn.classList.contains("active")?"auto":"manual";
