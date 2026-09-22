@@ -143,6 +143,7 @@
   <section class="card">
     <div class="sectionhead"><h2>今日のひとこと</h2><button class="pillbtn" id="copySummary">まとめをコピー</button></div>
     <div class="advice" id="advice"></div>
+    <button class="secondary" id="weeklyExport" style="margin-top:12px">🗓️ 1週間のまとめを書き出す</button>
   </section>
 </div>
 
@@ -155,14 +156,15 @@
       <label for="photoInput">📷 写真を選ぶ / 撮る<br><span class="tiny">自炊は料理、市販品は成分表示でOK</span></label>
       <input id="photoInput" type="file" accept="image/*" capture="environment">
       <img id="photoPreview" class="preview" alt="選択した写真">
+      <div class="tiny" id="photoPolicy" style="margin-top:8px">自炊写真は週間まとめまで、このiPhone内に一時保存します。</div>
     </div>
     <div class="seg">
       <button id="homeBtn" class="active" type="button">🍳 自炊</button>
       <button id="packBtn" type="button">🏷️ 市販品</button>
     </div>
     <div class="note">
-      <b>プロトタイプ版：</b> 画面と記録機能は動きます。写真そのものをAIで読み取る部分だけ未接続なので、
-      今は推定結果を確認するイメージで数字を入れます。将来はここを「写真→自動入力」に置き換えられます。
+      <b>ローカル保存版：</b> 記録はこのiPhone内に保存します。市販品の成分表写真は登録後に残さず、
+      自炊写真だけ週間まとめを書き出すまで一時保存します。AI写真解析は次の段階で接続します。
     </div>
 
     <div class="field"><label>名前</label><input id="foodName" placeholder="例：豚肉と野菜炒め"></div>
@@ -226,7 +228,7 @@ const defaultState = {
         plants: 0,
         ferment: false,
         prebiotic: false,
-        image: SAMPLE_IMG,
+        image: "",
         note: "成分表示より。100mlあたり31kcal × 240ml"
       }
     ]
@@ -236,6 +238,19 @@ let state = loadState();
 let currentDate = new Date();
 let entryType = "home";
 let pendingImage = "";
+
+
+const PHOTO_DB="food-memo-photos-v1", PHOTO_STORE="photos";
+function openPhotoDB(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(PHOTO_DB,1);
+    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(PHOTO_STORE))req.result.createObjectStore(PHOTO_STORE)};
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  });
+}
+async function putPhoto(id,data){const db=await openPhotoDB();return new Promise((res,rej)=>{const tx=db.transaction(PHOTO_STORE,"readwrite");tx.objectStore(PHOTO_STORE).put(data,id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
+async function getPhoto(id){const db=await openPhotoDB();return new Promise((res,rej)=>{const r=db.transaction(PHOTO_STORE).objectStore(PHOTO_STORE).get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
+async function deletePhoto(id){try{const db=await openPhotoDB();return await new Promise((res,rej)=>{const tx=db.transaction(PHOTO_STORE,"readwrite");tx.objectStore(PHOTO_STORE).delete(id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}catch(e){}}
 
 function loadState(){
   try {
@@ -286,13 +301,19 @@ function render(){
 
   const list=document.getElementById("mealList");
   if(!items.length) list.innerHTML='<div class="empty">まだ記録がありません。<br>下の「写真から追加」から始めましょう。</div>';
-  else list.innerHTML=items.map(x=>`
-    <div class="meal">
-      <img class="thumb" src="${x.image || ""}" onerror="this.style.visibility='hidden'">
-      <div><div class="mealname">${escapeHtml(x.name)}</div>
-      <div class="mealmeta">${x.type==="pack"?"市販品":"自炊"}${x.note?" · "+escapeHtml(x.note):""}</div></div>
-      <div class="kcal">${Math.round(x.kcal||0)} kcal<br><button class="pillbtn" onclick="removeItem('${x.id}')">削除</button></div>
-    </div>`).join("");
+  else {
+    list.innerHTML=items.map(x=>`
+      <div class="meal">
+        <img class="thumb" id="thumb-${x.id}" src="${x.image || ''}" onerror="this.style.visibility='hidden'">
+        <div><div class="mealname">${escapeHtml(x.name)}</div>
+        <div class="mealmeta">${x.type==="pack"?"市販品":"自炊"}${x.note?" · "+escapeHtml(x.note):""}</div></div>
+        <div class="kcal">${Math.round(x.kcal||0)} kcal<br><button class="pillbtn" onclick="removeItem('${x.id}')">削除</button></div>
+      </div>`).join("");
+    items.filter(x=>x.hasImage && !x.image).forEach(async x=>{
+      const data=await getPhoto(x.id); const el=document.getElementById(`thumb-${x.id}`);
+      if(data && el){el.src=data;el.style.visibility='visible'}
+    });
+  }
 
   document.getElementById("advice").innerHTML=makeAdvice(items,{kcal,fiber,protein,plants,ferment,prebiotic},s);
 }
@@ -321,8 +342,9 @@ function makeAdvice(items,t,s){
 function escapeHtml(s){
   return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 }
-function removeItem(id){
-  const k=keyOf(currentDate); state.days[k]=(state.days[k]||[]).filter(x=>x.id!==id); saveState(); render();
+async function removeItem(id){
+  const k=keyOf(currentDate); state.days[k]=(state.days[k]||[]).filter(x=>x.id!==id);
+  await deletePhoto(id); saveState(); render();
 }
 window.removeItem=removeItem;
 
@@ -339,6 +361,8 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>document.getE
 function setEntryType(t){
   entryType=t; homeBtn.classList.toggle("active",t==="home"); packBtn.classList.toggle("active",t==="pack");
   foodName.placeholder=t==="home"?"例：豚肉と野菜炒め":"例：森永 コーヒー 240ml";
+  const p=document.getElementById("photoPolicy");
+  if(p) p.textContent=t==="home"?"自炊写真は週間まとめまで、このiPhone内に一時保存します。":"市販品の成分表写真は解析・登録後に破棄し、記録データだけ残します。";
 }
 homeBtn.onclick=()=>setEntryType("home"); packBtn.onclick=()=>setEntryType("pack");
 
@@ -361,16 +385,20 @@ fillDemo.onclick=()=>{
   if(entryType==="pack"){foodName.value="市販の飲み物";foodKcal.value=120;foodFiber.value="";foodProtein.value=3.2;foodPlants.value=0;}
   else{foodName.value="豚肉と野菜炒め";foodKcal.value=430;foodFiber.value=5.5;foodProtein.value=24;foodPlants.value=5;foodPrebiotic.checked=true;}
 };
-saveFood.onclick=()=>{
+saveFood.onclick=async()=>{
   const name=foodName.value.trim(); if(!name){alert("名前だけ入れてください");return}
   const k=keyOf(currentDate); if(!state.days[k])state.days[k]=[];
+  const id=Date.now().toString(36);
+  const keepPhoto=entryType==="home" && !!pendingImage;
+  if(keepPhoto) await putPhoto(id,pendingImage);
   state.days[k].push({
-    id:Date.now().toString(36), type:entryType, name,
+    id, type:entryType, name,
     kcal:Number(foodKcal.value||0), fiber:foodFiber.value===""?null:Number(foodFiber.value),
     protein:foodProtein.value===""?null:Number(foodProtein.value),
     plants:Number(foodPlants.value||0), ferment:foodFerment.checked, prebiotic:foodPrebiotic.checked,
-    image:pendingImage||"", note:"写真から追加（プロトタイプ確認入力）"
+    hasImage:keepPhoto, image:"", note:entryType==="pack"?"成分表写真は登録後に破棄":"自炊写真は週間まとめまで一時保存"
   });
+  pendingImage="";
   saveState(); addDialog.close(); resetForm(); render();
 };
 function resetForm(){
@@ -383,8 +411,12 @@ saveSettings.onclick=()=>{
     targetPlants:Number(targetPlants.value||10), targetFerment:Number(targetFerment.value||2)
   }; saveState(); settingsDialog.close(); render();
 };
-clearDay.onclick=()=>{
-  if(confirm("この日の記録を全部消しますか？")){state.days[keyOf(currentDate)]=[];saveState();render()}
+clearDay.onclick=async()=>{
+  if(confirm("この日の記録を全部消しますか？")){
+    const k=keyOf(currentDate);
+    for(const x of (state.days[k]||[])) await deletePhoto(x.id);
+    state.days[k]=[];saveState();render();
+  }
 };
 copySummary.onclick=async()=>{
   const items=itemsToday(), kcal=sum(items,"kcal"), fiber=sum(items,"fiber"), plants=sum(items,"plants"), ferment=items.filter(x=>x.ferment).length;
@@ -395,6 +427,41 @@ render();
 </script>
 
 <script>
+
+function startOfWeek(d){const x=new Date(d);const diff=(x.getDay()+6)%7;x.setDate(x.getDate()-diff);x.setHours(0,0,0,0);return x}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function weekKeys(d){const s=startOfWeek(d);return Array.from({length:7},(_,i)=>keyOf(addDays(s,i)))}
+function shortDate(d){return `${d.getMonth()+1}/${d.getDate()}`}
+function roundRect(ctx,x,y,w,h,r){const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath()}
+function drawCover(ctx,img,x,y,w,h){const s=Math.max(w/img.width,h/img.height),dw=img.width*s,dh=img.height*s;ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh)}
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){let line="",yy=y;for(const ch of [...text]){const t=line+ch;if(ctx.measureText(t).width>maxWidth&&line){ctx.fillText(line,x,yy);line=ch;yy+=lineHeight}else line=t}if(line)ctx.fillText(line,x,yy)}
+async function exportWeek(){
+  const start=startOfWeek(currentDate),end=addDays(start,6),keys=weekKeys(currentDate);
+  const all=keys.flatMap(k=>state.days[k]||[]);
+  if(!all.length){alert("この週にはまだ記録がありません。");return}
+  const active=keys.filter(k=>(state.days[k]||[]).length).length||1;
+  const kcal=sum(all,"kcal"),fiber=sum(all,"fiber"),plants=sum(all,"plants"),ferment=all.filter(x=>x.ferment).length;
+  const photoItems=all.filter(x=>x.type==="home"&&(x.hasImage||x.image)).slice(0,6);
+  const photos=[];
+  for(const x of photoItems){const data=x.image||await getPhoto(x.id);if(data)photos.push({data,name:x.name})}
+  const W=1400,H=1800,c=document.createElement("canvas");c.width=W;c.height=H;const ctx=c.getContext("2d");
+  ctx.fillStyle="#f6f2e8";ctx.fillRect(0,0,W,H);ctx.fillStyle="#2d332c";ctx.font="700 58px -apple-system,sans-serif";ctx.fillText("今日食べたものメモ",90,110);ctx.font="700 34px -apple-system,sans-serif";ctx.fillText(`週間まとめ  ${shortDate(start)} - ${shortDate(end)}`,90,168);
+  ctx.fillStyle="#fffdf7";roundRect(ctx,70,220,1260,320,34);ctx.fill();ctx.fillStyle="#2d332c";ctx.font="700 32px -apple-system,sans-serif";ctx.fillText("今週のざっくり記録",110,285);
+  ctx.font="700 50px -apple-system,sans-serif";ctx.fillText(`${Math.round(kcal/active)} kcal`,110,380);ctx.font="500 26px -apple-system,sans-serif";ctx.fillStyle="#788076";ctx.fillText("1日平均",110,420);
+  ctx.fillStyle="#2d332c";ctx.font="700 42px -apple-system,sans-serif";ctx.fillText(`${(fiber/active).toFixed(1)} g`,520,380);ctx.font="500 26px -apple-system,sans-serif";ctx.fillStyle="#788076";ctx.fillText("食物繊維 / 日",520,420);
+  ctx.fillStyle="#2d332c";ctx.font="700 42px -apple-system,sans-serif";ctx.fillText(`${plants} 種`,900,380);ctx.font="500 26px -apple-system,sans-serif";ctx.fillStyle="#788076";ctx.fillText("植物性食品 合計",900,420);ctx.fillStyle="#2d332c";ctx.font="600 28px -apple-system,sans-serif";ctx.fillText(`発酵食品 ${ferment}品　・　記録 ${active}日`,110,490);
+  let y=615;ctx.font="700 34px -apple-system,sans-serif";ctx.fillText("自炊フォト",90,y);y+=42;
+  if(photos.length){const gap=24,size=(W-180-gap*2)/3;for(let i=0;i<photos.length;i++){const row=Math.floor(i/3),col=i%3,x=90+col*(size+gap),yy=y+row*(size+gap);try{const im=await loadImg(photos[i].data);ctx.save();roundRect(ctx,x,yy,size,size,28);ctx.clip();drawCover(ctx,im,x,yy,size,size);ctx.restore()}catch(e){}}y+=Math.ceil(photos.length/3)*(size+gap)+20}else{ctx.fillStyle="#788076";ctx.font="500 28px -apple-system,sans-serif";ctx.fillText("自炊写真はありません",90,y+35);y+=90}
+  const cardY=Math.min(y,1450);ctx.fillStyle="#fffdf7";roundRect(ctx,70,cardY,1260,250,34);ctx.fill();ctx.fillStyle="#2d332c";ctx.font="700 32px -apple-system,sans-serif";ctx.fillText("今週のひとこと",110,cardY+60);ctx.font="500 28px -apple-system,sans-serif";
+  const advice=makeAdvice(all,{kcal:kcal/active,fiber:fiber/active,protein:sum(all,"protein")/active,plants:plants/active,ferment:ferment/active,prebiotic:all.filter(x=>x.prebiotic).length/active},state.settings).replace(/<[^>]*>/g,"");wrapText(ctx,advice,110,cardY+112,1180,39);
+  const blob=await new Promise(res=>c.toBlob(res,"image/png",.92));const file=new File([blob],`food-memo_${keyOf(start)}_${keyOf(end)}.png`,{type:"image/png"});
+  let shared=false;try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"今日食べたものメモ・週間まとめ"});shared=true}}catch(e){if(e.name==="AbortError")return}
+  if(!shared){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+  setTimeout(async()=>{if(confirm("週間まとめを書き出しました。\n\n保存できたことを確認したら、この週の元データと一時保存写真を削除できます。\n\n削除しますか？")){for(const x of all)await deletePhoto(x.id);keys.forEach(k=>delete state.days[k]);saveState();render()}},700)
+}
+document.getElementById("weeklyExport").onclick=exportWeek;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(err => {
