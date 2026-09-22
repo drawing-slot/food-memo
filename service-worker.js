@@ -1,4 +1,4 @@
-const CACHE_NAME = "food-memo-v2-8-1";
+const CACHE_NAME = "food-memo-v2-8-2";
 const APP_SHELL = [
   "./manifest.webmanifest",
   "./icon-192.png",

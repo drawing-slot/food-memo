@@ -133,7 +133,7 @@
   <header>
     <div>
       <h1>今日食べたものメモ</h1>
-      <div class="sub">写真を投げて、ざっくり健康チェック。 <span style="font-size:11px;opacity:.7">v2.8.1</span></div>
+      <div class="sub">写真を投げて、ざっくり健康チェック。 <span style="font-size:11px;opacity:.7">v2.8.2</span></div>
     </div>
     <button class="iconbtn" id="settingsBtn" aria-label="設定">⚙️</button>
   </header>
@@ -782,7 +782,9 @@ const ANALYSIS_PROMPT=`この写真を「今日食べたものメモ」用に、
 たんぱく質：約○○ g
 植物性食品：○種類
 発酵食品：あり / なし
-腸活食材：あり / なし`;
+腸活食材：あり / なし
+
+※植物性食品の種類数を数えるときは、調味料を含めないでください。醤油、味噌、油、酢、砂糖、塩、ソース、ドレッシング、香辛料などは植物性食品として数えません。にんにく・ねぎ・しょうが等は、調味料や薬味としてごく少量ではなく、具材としてある程度食べている場合のみ1種類として数えてください。`;
 
 copyAnalysisPrompt.onclick=async()=>{
   try{await navigator.clipboard.writeText(ANALYSIS_PROMPT);pasteParseStatus.textContent="お願い文をコピーしました。ChatGPTに写真と一緒に送ってください。";}
