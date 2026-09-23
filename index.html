@@ -72,7 +72,7 @@
   .drop input{display:none}
   .drop label{display:block;cursor:pointer;font-weight:750}
   .preview{width:100%;max-height:220px;object-fit:cover;border-radius:14px;margin-top:12px;display:none}
-  .seg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:14px 0}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:14px 0}
   .seg button{border:1px solid var(--line);background:var(--soft);border-radius:12px;padding:10px}
   .seg button.active{background:var(--green2);border-color:#bdcfbb;color:#35533b;font-weight:750}
   .note{font-size:12px;color:var(--muted);background:#f3efe6;border-radius:12px;padding:10px 11px;line-height:1.55;margin:10px 0 14px}
@@ -125,6 +125,11 @@
   .inlineedit input{width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;background:white}
   .manualfallback{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
   .manualfallback summary{font-size:12px;color:var(--muted);cursor:pointer}
+  .mealactions{display:flex;gap:5px;justify-content:flex-end;margin-top:6px}
+  .mealactions .pillbtn{padding:5px 8px}
+  .favoriteitem{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+  .favoriteitem:first-child{border-top:0}
+  .foodnames{font-size:13px;line-height:1.55;font-weight:650}
   @media (max-width:390px){.hero{grid-template-columns:1fr} .nutrients{grid-template-columns:1fr}}
 </style>
 </head>
@@ -133,7 +138,7 @@
   <header>
     <div>
       <h1>今日食べたものメモ</h1>
-      <div class="sub">写真を投げて、ざっくり健康チェック。 <span style="font-size:11px;opacity:.7">v2.8.2</span></div>
+      <div class="sub">写真を投げて、ざっくり健康チェック。 <span style="font-size:11px;opacity:.7">v2.9</span></div>
     </div>
     <button class="iconbtn" id="settingsBtn" aria-label="設定">⚙️</button>
   </header>
@@ -167,8 +172,8 @@
     <div class="nutrients">
       <div class="nutri"><div class="name">食物繊維</div><div class="value" id="fiberValue">—</div><div class="status muted" id="fiberStatus">記録待ち</div></div>
       <div class="nutri"><div class="name">たんぱく質</div><div class="value" id="proteinValue">—</div><div class="status muted" id="proteinStatus">記録待ち</div></div>
-      <div class="nutri"><div class="name">発酵食品</div><div class="value" id="fermentValue">0 品</div><div class="status muted" id="fermentStatus">これから</div></div>
-      <div class="nutri"><div class="name">植物性食品の種類</div><div class="value" id="plantValue">0 種</div><div class="status muted" id="plantStatus">これから</div></div>
+      <div class="nutri"><div class="name">発酵食品</div><div class="value foodnames" id="fermentValue">—</div><div class="status muted" id="fermentStatus">これから</div></div>
+      <div class="nutri"><div class="name">植物性食品</div><div class="value foodnames" id="plantValue">—</div><div class="status muted" id="plantStatus">これから</div></div>
     </div>
   </section>
 
@@ -189,17 +194,19 @@
 <dialog id="addDialog">
   <div class="modal">
     <div class="modalhead"><h3>食べたものを追加</h3><button class="close" data-close="addDialog">×</button></div>
+    <button class="secondary" id="openFavorites" type="button" style="margin-top:0;margin-bottom:12px">⭐ いつものから追加</button>
     <div class="drop">
       <label for="photoInput">📷 写真を選ぶ / 撮る<br><span class="tiny">自炊は料理、市販品は成分表示でOK</span></label>
       <input id="photoInput" type="file" accept="image/*">
       <img id="photoPreview" class="preview" alt="選択した写真">
-      <div class="tiny" id="photoPolicy" style="margin-top:8px"></div>
+
     </div>
     <div class="seg">
       <button id="homeBtn" class="active" type="button">🍳 自炊</button>
       <button id="packBtn" type="button">🏷️ 市販品</button>
+      <button id="eatoutBtn" type="button">🍽️ 外食</button>
     </div>
-    <div class="note" id="storageNote"></div>
+
 
     <div id="analysisBox" class="analysisbox">
       <div id="analysisStatus" class="analysisstatus">写真を選んだら、ChatGPTで写真をざっくり解析して、結果をここに貼り付けます。</div>
@@ -212,9 +219,9 @@
 カロリー：約500 kcal
 食物繊維：約5 g
 たんぱく質：約14 g
-植物性食品：5種類
+植物性食品：しいたけ、ねぎ、にんにく
 発酵食品：なし
-腸活食材：あり"></textarea>
+腸活食材：しいたけ"></textarea>
         <div class="grid2" style="margin-top:8px">
           <button class="secondary" id="copyAnalysisPrompt" type="button">ChatGPT用のお願い文をコピー</button>
           <button class="primary" id="applyPastedAnalysis" type="button">貼り付け内容を反映</button>
@@ -229,6 +236,12 @@
           <div id="dishNameEdit" class="inlineedit"><input id="foodName" placeholder="料理名を入力"></div>
         </div>
         <button id="editDishName" class="editname" type="button">修正する</button>
+      </div>
+
+      <div class="modebox" style="margin:10px 0 12px">
+        <div class="resultlabel">判定された食材</div>
+        <div class="tiny" style="margin-top:6px"><b>植物性食品：</b><span id="plantFoodsDisplay">—</span></div>
+        <div class="tiny" style="margin-top:4px"><b>発酵食品：</b><span id="fermentedFoodsDisplay">—</span></div>
       </div>
 
       <div class="resultlabel" style="margin-top:10px">どのくらい食べた？</div>
@@ -251,14 +264,15 @@
           <div class="field"><label>カロリー（kcal）</label><input id="foodKcal" type="number" inputmode="decimal" placeholder="ざっくり"></div>
           <div class="field"><label>食物繊維（g）</label><input id="foodFiber" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
           <div class="field"><label>たんぱく質（g）</label><input id="foodProtein" type="number" inputmode="decimal" step="0.1" placeholder="不明なら空欄"></div>
-          <div class="field"><label>植物性食品の種類</label><input id="foodPlants" type="number" inputmode="numeric" placeholder="例：4"></div>
+          <div class="field"><label>植物性食品（食材名）</label><input id="foodPlants" type="text" placeholder="例：しいたけ、ねぎ、海苔"></div>
         </div>
-        <div class="checks">
-          <label class="check"><input type="checkbox" id="foodFerment"> 発酵食品</label>
-          <label class="check"><input type="checkbox" id="foodPrebiotic"> 腸活食材あり</label>
+        <div class="grid2">
+          <div class="field"><label>発酵食品（食品名）</label><input id="foodFerment" type="text" placeholder="例：味噌、納豆 / なし"></div>
+          <div class="field"><label>腸活食材（食品名）</label><input id="foodPrebiotic" type="text" placeholder="例：きのこ、海藻 / なし"></div>
         </div>
       </details>
 
+      <label class="check" style="margin-top:12px"><input type="checkbox" id="saveAsFavorite"> ⭐ いつものに保存する</label>
       <button class="primary" id="saveFood" style="margin-top:12px">この内容で記録</button>
       <button class="secondary" id="fillDemo">入力例で試す</button>
       <div class="tiny">※ 栄養値はざっくり把握用です。細かい修正はせず、料理名と食べた量だけ軽く確認して記録する設計です。</div>
@@ -367,51 +381,40 @@
     </div>
 
 
-    <div class="sectionlabel">データ処理の設定</div>
-    <div class="field">
-      <label>このアプリで使った写真を写真アプリにも残す</label>
-      <select id="photoSaveMode">
-        <option value="off">しない</option>
-        <option value="on">する</option>
-      </select>
-      <div class="tiny">ライブラリから選んだ元画像はそのまま残ります。ここでは、アプリ内で使った写真を写真アプリにも残す運用かどうかを決めます。</div>
-    </div>
-    <div class="field">
-      <label>週間まとめを書き出したら、この週のデータと写真を削除する</label>
-      <select id="deleteAfterExportMode">
-        <option value="on">する</option>
-        <option value="off">しない</option>
-      </select>
-      <div class="tiny">「する」の場合のみ、書き出し後に確認ダイアログを出します。写真アプリに保存した写真は残ります。</div>
-    </div>
+    <div class="sectionlabel">写真の保存について</div>
+    <div class="subnote">写真はこのアプリ内にも保存されます。写真アプリの元画像を削除しても、アプリ内の写真は残ります。アプリのデータを削除すると、保存した写真も消える場合があります。</div>
 
     <button class="primary" id="saveSettings">保存</button>
     <div class="tiny">基準値は健康な人を対象とした集団の目安です。体調や治療状況によって個別の目標は異なります。</div>
   </div>
 </dialog>
 
-<dialog id="exportDoneDialog">
+
+<dialog id="favoritesDialog">
   <div class="modal">
-    <div class="modalhead"><h3>週間まとめを書き出しました</h3><button class="close" data-close="exportDoneDialog">×</button></div>
-    <div class="advice">
-      書き出したデータを開きました。内容を確認したら、下のボタンを押してください。
-    </div>
-    <button class="primary" id="exportDoneConfirm">確認しました</button>
+    <div class="modalhead"><h3>⭐ いつもの</h3><button class="close" data-close="favoritesDialog">×</button></div>
+    <div class="subnote">一度保存したメニューは、ここから1タップで今日の記録に追加できます。</div>
+    <div id="favoriteList"></div>
   </div>
 </dialog>
 
-<dialog id="cleanupDialog">
+<dialog id="editDialog">
   <div class="modal">
-    <div class="modalhead"><h3>この週のデータを削除しますか？</h3><button class="close" data-close="cleanupDialog">×</button></div>
-    <div class="advice">
-      週間まとめを書き出しました。<br><br>
-      この週のデータと写真を削除してもいいですか？<br>
-      <span class="tiny">※ 写真アプリに保存した写真は残ります。</span>
+    <div class="modalhead"><h3>記録を編集</h3><button class="close" data-close="editDialog">×</button></div>
+    <input type="hidden" id="editId">
+    <div class="field"><label>料理名</label><input id="editName" type="text"></div>
+    <div class="field"><label>区分</label><select id="editType"><option value="home">自炊</option><option value="pack">市販品</option><option value="eatout">外食</option></select></div>
+    <div class="grid2">
+      <div class="field"><label>カロリー（kcal）</label><input id="editKcal" type="number" inputmode="decimal"></div>
+      <div class="field"><label>食物繊維（g）</label><input id="editFiber" type="number" step="0.1" inputmode="decimal"></div>
+      <div class="field"><label>たんぱく質（g）</label><input id="editProtein" type="number" step="0.1" inputmode="decimal"></div>
+      <div class="field"><label>食べた量</label><select id="editAmount"><option>全部</option><option>半分</option><option>少し</option></select></div>
     </div>
-    <div class="actions">
-      <button class="secondary" id="cleanupNo" style="margin-top:0">いいえ</button>
-      <button class="primary" id="cleanupYes">はい</button>
-    </div>
+    <div class="field"><label>植物性食品</label><input id="editPlantFoods" type="text" placeholder="例：ねぎ、しいたけ、海苔"></div>
+    <div class="field"><label>発酵食品</label><input id="editFermentedFoods" type="text" placeholder="例：味噌、納豆 / なし"></div>
+    <div class="field"><label>腸活食材</label><input id="editPrebioticFoods" type="text" placeholder="例：きのこ、海藻 / なし"></div>
+    <div class="field"><label>写真にない単品</label><input id="editExtras" type="text" placeholder="例：海苔、梅干し"></div>
+    <button class="primary" id="saveEdit">変更を保存</button>
   </div>
 </dialog>
 
@@ -441,10 +444,11 @@ const defaultSettings = {
   gutDetail: true,
   referenceVersion: "2025",
   saveToPhotos: false,
-  deleteAfterExport: true
+  deleteAfterExport: false
 };
 const defaultState = {
   settings: { ...defaultSettings },
+  favorites: [],
   days: {
     "2026-09-22": [
       {
@@ -496,8 +500,10 @@ function normalizeState(raw){
     settings.targetFerment=null;
     settings.gutTargetsConfigured=false;
   }
+  settings.saveToPhotos=false; settings.deleteAfterExport=false;
   const days=raw.days&&typeof raw.days==="object"?raw.days:base.days;
-  return {settings,days};
+  const favorites=Array.isArray(raw.favorites)?raw.favorites:[];
+  return {settings,days,favorites};
 }
 function loadState(){
   try {
@@ -515,38 +521,21 @@ function fmtDate(d){
 }
 function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
 function sum(items, key){return items.reduce((a,x)=>a+(Number.isFinite(Number(x[key]))?Number(x[key]):0),0)}
+function splitFoodNames(v){
+  const s=String(v||"").trim();
+  if(!s || /^(なし|無し|無|0|—|-)$/.test(s)) return [];
+  return [...new Set(s.replace(/[、，]/g,",").split(/[,・\/／]/).map(x=>x.trim()).filter(Boolean).filter(x=>!/^(あり|有|yes|true)$/i.test(x)))];
+}
+function itemPlantNames(x){return Array.isArray(x.plantFoods)?x.plantFoods:[]}
+function itemFermentNames(x){return Array.isArray(x.fermentedFoods)?x.fermentedFoods:[]}
+function itemPrebioticNames(x){return Array.isArray(x.prebioticFoods)?x.prebioticFoods:[]}
+function uniqueNames(items, getter){return [...new Set(items.flatMap(getter).filter(Boolean))]}
+function typeLabel(t){return t==="pack"?"市販品":t==="eatout"?"外食":"自炊"}
+function itemPlantCount(x){return itemPlantNames(x).length || Number(x.plants||0)}
+function itemFermentCount(x){return itemFermentNames(x).length || (x.ferment?1:0)}
+
 function itemsToday(){return state.days[keyOf(currentDate)] || []}
-function photoPolicyText(){
-  const s=state.settings||defaultSettings;
-  const part1=s.saveToPhotos
-    ? "写真はこのアプリ内に一時保存し、写真アプリにも残す前提で扱います。"
-    : "写真はこのアプリ内に一時保存します。";
-  const part2=s.deleteAfterExport
-    ? "週間まとめ後は、このアプリ内のデータと写真を削除する設定です。"
-    : "週間まとめ後も、このアプリ内のデータと写真を残す設定です。";
-  return `${part1} ${part2}`;
-}
-function storageNoteText(){
-  const s=state.settings||defaultSettings;
-  const part1=s.saveToPhotos
-    ? "記録はこのiPhone内に保存し、写真はアプリ内に一時保存します。必要に応じて写真アプリにも残す運用です。"
-    : "記録はこのiPhone内に保存し、写真はアプリ内に一時保存します。";
-  const part2=s.deleteAfterExport
-    ? "週間まとめを書き出したあと、このアプリ内のデータと写真を削除できます。"
-    : "週間まとめを書き出したあとも、このアプリ内のデータと写真を残します。";
-  return `<b>ローカル保存版：</b> ${part1} ${part2} 自炊写真も市販品の成分表示写真も同じルールで扱います。写真はこのアプリから外部の解析サービスへ自動送信しません。通常の記録データはこのiPhone内に保存します。`;
-}
-function recordPhotoNote(){
-  return state.settings.deleteAfterExport
-    ? "写真は週間まとめ後の設定に従って扱います"
-    : "写真はアプリ内に保存したままにします";
-}
-function updateStorageTexts(){
-  const p=document.getElementById("photoPolicy");
-  const n=document.getElementById("storageNote");
-  if(p) p.textContent=photoPolicyText();
-  if(n) n.innerHTML=storageNoteText();
-}
+
 
 // 厚生労働省「日本人の食事摂取基準（2025年版）」成人の基準値
 // 推定エネルギー必要量: 参考表2、食物繊維: 1-4 炭水化物の目標量（成人）
@@ -609,9 +598,12 @@ function render(){
   const key=keyOf(currentDate), items=itemsToday(), s=state.settings;
   document.getElementById("dateLabel").textContent=fmtDate(currentDate);
   document.getElementById("dateSub").textContent=key;
-  updateStorageTexts();
-  const kcal=sum(items,"kcal"), fiber=sum(items,"fiber"), protein=sum(items,"protein"), plants=sum(items,"plants");
-  const ferment=items.filter(x=>x.ferment).length, prebiotic=items.filter(x=>x.prebiotic).length;
+  const kcal=sum(items,"kcal"), fiber=sum(items,"fiber"), protein=sum(items,"protein");
+  const plantNames=uniqueNames(items,itemPlantNames), fermentNames=uniqueNames(items,itemFermentNames), prebioticNames=uniqueNames(items,itemPrebioticNames);
+  const fallbackPlants=items.filter(x=>!itemPlantNames(x).length).reduce((a,x)=>a+Number(x.plants||0),0);
+  const plants=plantNames.length+fallbackPlants;
+  const ferment=fermentNames.length+items.filter(x=>!itemFermentNames(x).length&&x.ferment).length;
+  const prebiotic=prebioticNames.length+items.filter(x=>!itemPrebioticNames(x).length&&x.prebiotic).length;
   document.getElementById("kcalTotal").textContent=Math.round(kcal);
   document.getElementById("kcalBar").style.width=clamp(kcal/s.targetKcal*100,0,100)+"%";
   document.getElementById("kcalHint").textContent=`目安 ${s.targetKcal} kcal（設定で変更可）`;
@@ -626,28 +618,30 @@ function render(){
   const gut=Math.round(detailOn?(fiberScore+plantScore+fermentScore+preScore):(fiberScore+preScore));
   document.getElementById("gutScore").textContent=gut;
   document.getElementById("fiberChip").textContent=`食物繊維 ${fiber ? fiber.toFixed(1) : "0"}g`;
-  document.getElementById("plantChip").textContent=detailOn?`植物 ${plants}種`:"植物 詳細OFF";
-  document.getElementById("fermentChip").textContent=detailOn?`発酵 ${ferment}品`:"発酵 詳細OFF";
+  document.getElementById("plantChip").textContent=detailOn?(plants?"植物 ✓":"植物 —"):"植物 詳細OFF";
+  document.getElementById("fermentChip").textContent=detailOn?(ferment?"発酵 ✓":"発酵 —"):"発酵 詳細OFF";
 
   setNutri("fiber", fiber, s.targetFiber, "g");
   document.getElementById("proteinValue").textContent=protein ? `${protein.toFixed(1)} g` : "—";
   document.getElementById("proteinStatus").textContent=protein ? "記録分の合計" : "判定材料がまだ少ない";
   document.getElementById("proteinStatus").className="status "+(protein?"good":"muted");
-  document.getElementById("fermentValue").textContent=detailOn?`${ferment} 品`:"—";
+  document.getElementById("fermentValue").textContent=detailOn?(fermentNames.length?fermentNames.join("、"):(ferment?"記録あり（旧データ）":"—")):"—";
   setStatus("fermentStatus", !detailOn?"詳細チェックOFF":!fermentTarget?"目安未設定":(ferment>=fermentTarget?"十分":ferment>0?"もう少し":"まだ少なめ"), !detailOn||!fermentTarget?"muted":(ferment>=fermentTarget?"good":ferment>0?"warn":"muted"));
-  document.getElementById("plantValue").textContent=detailOn?`${plants} 種`:"—";
+  document.getElementById("plantValue").textContent=detailOn?(plantNames.length?plantNames.join("、"):(plants?"食材名なし（旧データ）":"—")):"—";
   setStatus("plantStatus", !detailOn?"詳細チェックOFF":!plantTarget?"目安未設定":(plants>=plantTarget?"十分":plants>=Math.ceil(plantTarget/2)?"もう少し":"まだ少なめ"), !detailOn||!plantTarget?"muted":(plants>=plantTarget?"good":plants?"warn":"muted"));
 
   const list=document.getElementById("mealList");
   if(!items.length) list.innerHTML='<div class="empty">まだ記録がありません。<br>下の「写真から追加」から始めましょう。</div>';
   else {
-    list.innerHTML=items.map(x=>`
+    list.innerHTML=items.map(x=>{
+      const meta=[typeLabel(x.type),x.amount?`量：${x.amount}`:"",Array.isArray(x.extras)&&x.extras.length?`追加：${x.extras.join("・")}`:""].filter(Boolean).join(" · ");
+      return `
       <div class="meal">
         <img class="thumb" id="thumb-${x.id}" src="${x.image || ''}" onerror="this.style.visibility='hidden'">
         <div><div class="mealname">${escapeHtml(x.name)}</div>
-        <div class="mealmeta">${x.type==="pack"?"市販品":"自炊"}${x.note?" · "+escapeHtml(x.note):""}</div></div>
-        <div class="kcal">${Math.round(x.kcal||0)} kcal<br><button class="pillbtn" onclick="removeItem('${x.id}')">削除</button></div>
-      </div>`).join("");
+        <div class="mealmeta">${escapeHtml(meta)}</div></div>
+        <div class="kcal">${Math.round(x.kcal||0)} kcal<div class="mealactions"><button class="pillbtn" onclick="openEditItem('${x.id}')">編集</button><button class="pillbtn" onclick="removeItem('${x.id}')">削除</button></div></div>
+      </div>`}).join("");
     items.filter(x=>x.hasImage && !x.image).forEach(async x=>{
       const data=await getPhoto(x.id); const el=document.getElementById(`thumb-${x.id}`);
       if(data && el){el.src=data;el.style.visibility='visible'}
@@ -705,8 +699,6 @@ document.getElementById("settingsBtn").onclick=()=>{
   profileSex.value=s.sex||"female";
   profileActivity.value=s.activity||"normal";
   gutDetailMode.value=s.gutDetail===false?"off":"on";
-  photoSaveMode.value=s.saveToPhotos?"on":"off";
-  deleteAfterExportMode.value=s.deleteAfterExport?"on":"off";
   setIntakeMode(s.intakeMode||"manual");
   setGutDetailMode(s.gutDetail===false?"off":"on");
   referenceResult.innerHTML=s.intakeMode==="auto"&&s.age?`<b>${s.age}歳・${s.sex==="female"?"女性":"男性"}・活動量 ${s.activity==="low"?"低い":s.activity==="normal"?"ふつう":"高い"}</b><br>1日のカロリー目安：${Number(s.targetKcal).toLocaleString()} kcal<br>食物繊維目安：${s.targetFiber} g<br><span style="font-size:10px">基準：厚生労働省「日本人の食事摂取基準（2025年版）」</span>`:"年齢・性別・活動量を入力すると、基準値が自動で反映されます。";
@@ -729,9 +721,9 @@ function setEntryType(t){
   entryType=t;
   homeBtn.classList.toggle("active",t==="home");
   packBtn.classList.toggle("active",t==="pack");
-  updateStorageTexts();
+  eatoutBtn.classList.toggle("active",t==="eatout");
 }
-homeBtn.onclick=()=>setEntryType("home"); packBtn.onclick=()=>setEntryType("pack");
+homeBtn.onclick=()=>setEntryType("home"); packBtn.onclick=()=>setEntryType("pack"); eatoutBtn.onclick=()=>setEntryType("eatout");
 
 photoInput.onchange=async(e)=>{
   const file=e.target.files[0]; if(!file)return;
@@ -755,6 +747,7 @@ function resetAnalysisReview(){
   selectedAmount=1; extraItems=[]; pendingAnalysis=null;
   document.querySelectorAll("[data-amount]").forEach(b=>b.classList.toggle("active",b.dataset.amount==="1"));
   dishNameDisplay.textContent="—";
+  plantFoodsDisplay.textContent="—"; fermentedFoodsDisplay.textContent="—";
   foodName.value="";
   dishNameEdit.classList.remove("show");
   editDishName.textContent="修正する";
@@ -764,8 +757,8 @@ function resetAnalysisReview(){
   if(typeof analysisPaste!=="undefined") analysisPaste.value="";
   if(typeof pasteParseStatus!=="undefined") pasteParseStatus.textContent="";
   renderExtraItems();
-  [foodKcal,foodFiber,foodProtein,foodPlants].forEach(x=>x.value="");
-  foodFerment.checked=false; foodPrebiotic.checked=false;
+  [foodKcal,foodFiber,foodProtein,foodPlants,foodFerment,foodPrebiotic].forEach(x=>x.value="");
+  saveAsFavorite.checked=false;
 }
 function preparePasteAnalysis(){
   analysisStatus.innerHTML='写真を選びました。<b>ChatGPTでこの写真を解析</b>して、結果を下に貼り付けてください。';
@@ -780,11 +773,12 @@ const ANALYSIS_PROMPT=`この写真を「今日食べたものメモ」用に、
 カロリー：約○○ kcal
 食物繊維：約○○ g
 たんぱく質：約○○ g
-植物性食品：○種類
-発酵食品：あり / なし
-腸活食材：あり / なし
+植物性食品：食材名を「、」区切り（該当なしは「なし」）
+発酵食品：食品名を「、」区切り（該当なしは「なし」）
+腸活食材：食材名を「、」区切り（該当なしは「なし」）
 
-※植物性食品の種類数を数えるときは、調味料を含めないでください。醤油、味噌、油、酢、砂糖、塩、ソース、ドレッシング、香辛料などは植物性食品として数えません。にんにく・ねぎ・しょうが等は、調味料や薬味としてごく少量ではなく、具材としてある程度食べている場合のみ1種類として数えてください。`;
+※植物性食品を判定するときは、調味料を含めないでください。醤油、味噌、油、酢、砂糖、塩、ソース、ドレッシング、香辛料などは植物性食品として数えません。にんにく・ねぎ・しょうが等は、調味料や薬味としてごく少量ではなく、具材としてある程度食べている場合のみ植物性食品として挙げてください。
+※「植物性食品」「発酵食品」「腸活食材」は、数や「あり／なし」だけではなく、該当すると判断した食材・食品名を書いてください。`;
 
 copyAnalysisPrompt.onclick=async()=>{
   try{await navigator.clipboard.writeText(ANALYSIS_PROMPT);pasteParseStatus.textContent="お願い文をコピーしました。ChatGPTに写真と一緒に送ってください。";}
@@ -809,15 +803,14 @@ function parsePastedAnalysis(text){
     return "";
   };
   const num=(s)=>{const m=String(s||"").replace(/,/g,"").match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
-  const yes=(s)=>/あり|有|yes|true|含む|ある/i.test(String(s||""))&&!/なし|無|false|ない/i.test(String(s||""));
   const name=line("料理名","食品名","商品名","名前");
   const kcal=num(line("カロリー","エネルギー","kcal"));
   const fiber=num(line("食物繊維","繊維"));
   const protein=num(line("たんぱく質","タンパク質","蛋白質"));
-  const plants=num(line("植物性食品","植物性食材","植物由来食品"));
-  const fermentText=line("発酵食品","発酵");
-  const preText=line("腸活食材","プレバイオティクス");
-  return {name,kcal:kcal??0,fiber,protein,plants:plants??0,ferment:yes(fermentText),prebiotic:yes(preText)};
+  const plantFoods=splitFoodNames(line("植物性食品","植物性食材","植物由来食品"));
+  const fermentedFoods=splitFoodNames(line("発酵食品","発酵"));
+  const prebioticFoods=splitFoodNames(line("腸活食材","プレバイオティクス"));
+  return {name,kcal:kcal??0,fiber,protein,plantFoods,fermentedFoods,prebioticFoods};
 }
 
 function applyAnalysisResult(data){
@@ -826,18 +819,20 @@ function applyAnalysisResult(data){
     kcal:Number(data.kcal||0),
     fiber:data.fiber==null?null:Number(data.fiber),
     protein:data.protein==null?null:Number(data.protein),
-    plants:Number(data.plants||0),
-    ferment:!!data.ferment,
-    prebiotic:!!data.prebiotic
+    plantFoods:Array.isArray(data.plantFoods)?data.plantFoods:[],
+    fermentedFoods:Array.isArray(data.fermentedFoods)?data.fermentedFoods:[],
+    prebioticFoods:Array.isArray(data.prebioticFoods)?data.prebioticFoods:[]
   };
   foodName.value=pendingAnalysis.name;
   dishNameDisplay.textContent=pendingAnalysis.name;
   foodKcal.value=pendingAnalysis.kcal||"";
   foodFiber.value=pendingAnalysis.fiber??"";
   foodProtein.value=pendingAnalysis.protein??"";
-  foodPlants.value=pendingAnalysis.plants||"";
-  foodFerment.checked=pendingAnalysis.ferment;
-  foodPrebiotic.checked=pendingAnalysis.prebiotic;
+  foodPlants.value=pendingAnalysis.plantFoods.join("、");
+  foodFerment.value=pendingAnalysis.fermentedFoods.join("、");
+  foodPrebiotic.value=pendingAnalysis.prebioticFoods.join("、");
+  plantFoodsDisplay.textContent=pendingAnalysis.plantFoods.length?pendingAnalysis.plantFoods.join("、"):"なし";
+  fermentedFoodsDisplay.textContent=pendingAnalysis.fermentedFoods.length?pendingAnalysis.fermentedFoods.join("、"):"なし";
 }
 editDishName.onclick=()=>{
   const open=!dishNameEdit.classList.contains("show");
@@ -870,7 +865,7 @@ window.removeExtra=(i)=>{extraItems.splice(i,1);renderExtraItems();};
 
 fillDemo.onclick=()=>{
   analysisBox.classList.add("show");
-  applyAnalysisResult({name:"きのこ炒飯",kcal:500,fiber:5,protein:14,plants:5,ferment:false,prebiotic:true});
+  applyAnalysisResult({name:"きのこ炒飯",kcal:500,fiber:5,protein:14,plantFoods:["しいたけ","ねぎ","にんにく"],fermentedFoods:[],prebioticFoods:["しいたけ"]});
   analysisStatus.textContent="ChatGPT解析結果の入力例です。料理名と食べた量だけ確認してください。";
 };
 saveFood.onclick=async()=>{
@@ -881,25 +876,26 @@ saveFood.onclick=async()=>{
   if(keepPhoto) await putPhoto(id,pendingImage);
   const mult=selectedAmount;
   const baseKcal=Number(foodKcal.value||0), baseFiber=foodFiber.value===""?null:Number(foodFiber.value), baseProtein=foodProtein.value===""?null:Number(foodProtein.value);
-  const normalizedExtras=extraItems.map(x=>typeof x==="string"?{name:x,kcal:0,fiber:null,protein:null,plants:0,ferment:false,prebiotic:false}:x);
+  const normalizedExtras=extraItems.map(x=>typeof x==="string"?{name:x,kcal:0,fiber:null,protein:null}:x);
   const extraKcal=normalizedExtras.reduce((a,x)=>a+Number(x.kcal||0),0);
   const extraFiber=normalizedExtras.reduce((a,x)=>a+(x.fiber==null?0:Number(x.fiber||0)),0);
   const extraProtein=normalizedExtras.reduce((a,x)=>a+(x.protein==null?0:Number(x.protein||0)),0);
-  const extraPlants=normalizedExtras.reduce((a,x)=>a+Number(x.plants||0),0);
-  const extraFerment=normalizedExtras.filter(x=>x.ferment).length;
-  const extraPrebiotic=normalizedExtras.some(x=>x.prebiotic);
   const amountLabel=mult===1?"全部":mult===0.5?"半分":"少し";
   const scaledFiber=baseFiber==null?null:Number((baseFiber*mult).toFixed(1));
   const scaledProtein=baseProtein==null?null:Number((baseProtein*mult).toFixed(1));
-  state.days[k].push({
+  const plantFoods=splitFoodNames(foodPlants.value), fermentedFoods=splitFoodNames(foodFerment.value), prebioticFoods=splitFoodNames(foodPrebiotic.value);
+  const rec={
     id, type:entryType, name,
     kcal:Math.round(baseKcal*mult+extraKcal),
     fiber:(scaledFiber==null && extraFiber===0)?null:Number(((scaledFiber||0)+extraFiber).toFixed(1)),
     protein:(scaledProtein==null && extraProtein===0)?null:Number(((scaledProtein||0)+extraProtein).toFixed(1)),
-    plants:Number(foodPlants.value||0)+extraPlants, ferment:foodFerment.checked||extraFerment>0, prebiotic:foodPrebiotic.checked||extraPrebiotic,
+    plants:plantFoods.length, ferment:fermentedFoods.length>0, prebiotic:prebioticFoods.length>0,
+    plantFoods, fermentedFoods, prebioticFoods,
     extras:normalizedExtras.map(x=>x.name), amount:amountLabel,
-    hasImage:keepPhoto, image:"", note:[`量：${amountLabel}`,normalizedExtras.length?`追加：${normalizedExtras.map(x=>x.name).join("・")}`:"",recordPhotoNote()].filter(Boolean).join(" · ")
-  });
+    hasImage:keepPhoto, image:"", note:""
+  };
+  state.days[k].push(rec);
+  if(saveAsFavorite.checked) addFavoriteFromRecord(rec);
   pendingImage="";
   saveState(); addDialog.close(); resetForm(); render();
 };
@@ -928,11 +924,45 @@ saveSettings.onclick=()=>{
     activity:profileActivity.value,
     gutDetail:gutOn,
     referenceVersion:"2025",
-    saveToPhotos: photoSaveMode.value==="on",
-    deleteAfterExport: deleteAfterExportMode.value==="on"
+    saveToPhotos:false,
+    deleteAfterExport:false
   };
   saveState(); settingsDialog.close(); render();
 };
+
+function addFavoriteFromRecord(rec){
+  if(!Array.isArray(state.favorites)) state.favorites=[];
+  const fav={id:"fav-"+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:rec.name,type:rec.type,kcal:rec.kcal,fiber:rec.fiber,protein:rec.protein,plants:rec.plants,ferment:rec.ferment,prebiotic:rec.prebiotic,plantFoods:[...(rec.plantFoods||[])],fermentedFoods:[...(rec.fermentedFoods||[])],prebioticFoods:[...(rec.prebioticFoods||[])],extras:[...(rec.extras||[])],amount:rec.amount||"全部"};
+  const existing=state.favorites.findIndex(x=>x.name===fav.name&&x.type===fav.type);
+  if(existing>=0) state.favorites[existing]=fav; else state.favorites.push(fav);
+}
+function renderFavorites(){
+  const list=document.getElementById("favoriteList"), favs=state.favorites||[];
+  if(!favs.length){list.innerHTML='<div class="empty">まだ「いつもの」はありません。<br>食事を記録するときに「いつものに保存する」を選ぶと、ここに追加されます。</div>';return;}
+  list.innerHTML=favs.map(f=>`<div class="favoriteitem"><div><div class="mealname">${escapeHtml(f.name)}</div><div class="mealmeta">${typeLabel(f.type)} · ${Math.round(f.kcal||0)} kcal</div></div><div><button class="pillbtn" onclick="addFavoriteToToday('${f.id}')">追加</button><button class="pillbtn" onclick="deleteFavorite('${f.id}')">削除</button></div></div>`).join("");
+}
+window.addFavoriteToToday=(id)=>{
+  const f=(state.favorites||[]).find(x=>x.id===id); if(!f)return;
+  const k=keyOf(currentDate); if(!state.days[k])state.days[k]=[];
+  state.days[k].push({...structuredClone(f),id:Date.now().toString(36),hasImage:false,image:"",note:""});
+  saveState(); favoritesDialog.close(); render();
+};
+window.deleteFavorite=(id)=>{state.favorites=(state.favorites||[]).filter(x=>x.id!==id);saveState();renderFavorites();};
+openFavorites.onclick=()=>{renderFavorites();addDialog.close();favoritesDialog.showModal();};
+
+window.openEditItem=(id)=>{
+  const x=itemsToday().find(v=>v.id===id); if(!x)return;
+  editId.value=id; editName.value=x.name||""; editType.value=x.type||"home"; editKcal.value=x.kcal??""; editFiber.value=x.fiber??""; editProtein.value=x.protein??""; editAmount.value=x.amount||"全部";
+  editPlantFoods.value=itemPlantNames(x).join("、"); editFermentedFoods.value=itemFermentNames(x).join("、"); editPrebioticFoods.value=itemPrebioticNames(x).join("、"); editExtras.value=Array.isArray(x.extras)?x.extras.join("、"):"";
+  editDialog.showModal();
+};
+saveEdit.onclick=()=>{
+  const id=editId.value, x=itemsToday().find(v=>v.id===id); if(!x)return;
+  x.name=editName.value.trim()||x.name; x.type=editType.value; x.kcal=Number(editKcal.value||0); x.fiber=editFiber.value===""?null:Number(editFiber.value); x.protein=editProtein.value===""?null:Number(editProtein.value); x.amount=editAmount.value;
+  x.plantFoods=splitFoodNames(editPlantFoods.value); x.fermentedFoods=splitFoodNames(editFermentedFoods.value); x.prebioticFoods=splitFoodNames(editPrebioticFoods.value); x.plants=x.plantFoods.length; x.ferment=x.fermentedFoods.length>0; x.prebiotic=x.prebioticFoods.length>0; x.extras=splitFoodNames(editExtras.value); x.note="";
+  saveState(); editDialog.close(); render();
+};
+
 clearDay.onclick=async()=>{
   if(confirm("この日の記録を全部消しますか？")){
     const k=keyOf(currentDate);
@@ -941,8 +971,14 @@ clearDay.onclick=async()=>{
   }
 };
 copySummary.onclick=async()=>{
-  const items=itemsToday(), kcal=sum(items,"kcal"), fiber=sum(items,"fiber"), plants=sum(items,"plants"), ferment=items.filter(x=>x.ferment).length;
-  const txt=`今日食べたものメモ\n${keyOf(currentDate)}\n摂取カロリー：約${Math.round(kcal)}kcal\n食物繊維：約${fiber.toFixed(1)}g\n植物性食品：${plants}種\n発酵食品：${ferment}品`;
+  const items=itemsToday(), kcal=sum(items,"kcal"), fiber=sum(items,"fiber");
+  const plantNames=uniqueNames(items,itemPlantNames), fermentNames=uniqueNames(items,itemFermentNames);
+  const txt=`今日食べたものメモ
+${keyOf(currentDate)}
+摂取カロリー：約${Math.round(kcal)}kcal
+食物繊維：約${fiber.toFixed(1)}g
+植物性食品：${plantNames.length?plantNames.join("、"):"なし／食材名未登録"}
+発酵食品：${fermentNames.length?fermentNames.join("、"):"なし／食品名未登録"}`;
   try{await navigator.clipboard.writeText(txt);alert("まとめをコピーしました")}catch(e){prompt("コピーしてください",txt)}
 };
 render();
@@ -971,7 +1007,10 @@ async function exportWeek(){
   const all=keys.flatMap(k=>state.days[k]||[]);
   if(!all.length){alert("この週にはまだ記録がありません。");return}
   const active=keys.filter(k=>(state.days[k]||[]).length).length||1;
-  const kcal=sum(all,"kcal"),fiber=sum(all,"fiber"),plants=sum(all,"plants"),ferment=all.filter(x=>x.ferment).length;
+  const kcal=sum(all,"kcal"),fiber=sum(all,"fiber");
+  const weekPlantNames=uniqueNames(all,itemPlantNames), weekFermentNames=uniqueNames(all,itemFermentNames);
+  const plants=weekPlantNames.length+all.filter(x=>!itemPlantNames(x).length).reduce((a,x)=>a+Number(x.plants||0),0);
+  const ferment=weekFermentNames.length+all.filter(x=>!itemFermentNames(x).length&&x.ferment).length;
   const photoItems=all.filter(x=>x.type==="home"&&(x.hasImage||x.image)).slice(0,6);
   const photos=[];
   for(const x of photoItems){const data=x.image||await getPhoto(x.id);if(data)photos.push({data,name:x.name})}
@@ -998,23 +1037,8 @@ async function exportWeek(){
   }
   setTimeout(()=>URL.revokeObjectURL(url), 60000);
 
-  if(state.settings.deleteAfterExport){
-    pendingExportCleanup={keys,all};
-    exportDoneDialog.showModal();
-  } else {
-    pendingExportCleanup=null;
-  }
-}document.getElementById("weeklyExport").onclick=exportWeek;
-exportDoneConfirm.onclick=()=>{
-  exportDoneDialog.close();
-  if(state.settings.deleteAfterExport) cleanupDialog.showModal();
-};
-cleanupNo.onclick=()=>{ pendingExportCleanup=null; cleanupDialog.close(); };
-cleanupYes.onclick=async()=>{
-  await cleanupExportedWeek(pendingExportCleanup);
-  pendingExportCleanup=null;
-  cleanupDialog.close();
-};
+}
+document.getElementById("weeklyExport").onclick=exportWeek;
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {

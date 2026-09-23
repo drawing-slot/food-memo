@@ -1,59 +1,13 @@
-const CACHE_NAME = "food-memo-v2-8-2";
-const APP_SHELL = [
-  "./manifest.webmanifest",
-  "./icon-192.png",
-  "./icon-512.png"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
-  );
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
-  );
-  self.clients.claim();
-});
-
+const CACHE = "food-memo-v2-9";
+const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+self.addEventListener("install", event => { self.skipWaiting(); event.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); });
+self.addEventListener("activate", event => { event.waitUntil((async()=>{ for (const key of await caches.keys()) if(key!==CACHE) await caches.delete(key); await self.clients.claim(); })()); });
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
-
-  const req = event.request;
-  const url = new URL(req.url);
-
-  // HTML/navigation: always try the network without using the HTTP cache.
-  // This prevents an installed iPhone PWA from getting stuck on an old index.html.
-  if (req.mode === "navigate" || url.pathname.endsWith("/index.html") || url.pathname.endsWith("/food-memo/")) {
-    event.respondWith(
-      fetch(req, { cache: "no-store" })
-        .then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
+  if(event.request.method!=="GET") return;
+  const url=new URL(event.request.url);
+  if(event.request.mode==="navigate" || url.pathname.endsWith("/index.html") || url.pathname.endsWith("/")){
+    event.respondWith(fetch(event.request,{cache:"no-store"}).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(event.request,copy));return r;}).catch(()=>caches.match(event.request).then(r=>r||caches.match("./index.html"))));
     return;
   }
-
-  // App assets: network first, cached fallback.
-  event.respondWith(
-    fetch(req, { cache: "no-cache" })
-      .then(response => {
-        if (response && response.ok && url.origin === self.location.origin) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(req))
-  );
+  event.respondWith(caches.match(event.request).then(r=>r||fetch(event.request).then(net=>{const copy=net.clone();caches.open(CACHE).then(c=>c.put(event.request,copy));return net;})));
 });
